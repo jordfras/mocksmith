@@ -1,0 +1,88 @@
+use crate::builder;
+use crate::model;
+
+pub fn generate_mock(
+    mut builder: builder::CodeBuilder,
+    class: &model::ClassToMock,
+    mock_name: &str,
+) -> String {
+    if let Some(namespace_start) = namespace_start(&class.namespaces) {
+        builder.add_line(namespace_start.as_str());
+    }
+
+    builder.add_line(&format!(
+        "class {} : public {}",
+        mock_name,
+        class.class.get_name().unwrap()
+    ));
+    builder.add_line("{");
+    builder.add_line("public:");
+    builder.push_indent();
+    for method in class.methods() {
+        builder.add_line(&format!(
+            "MOCK_METHOD({}, {}, ({}), (override));",
+            method_return_type(&method),
+            method.get_name().expect("Method should have a name"),
+            method_arguments(&method).join(", ")
+        ));
+    }
+    builder.pop_indent();
+    builder.add_line("};");
+
+    if let Some(namespace_end) = namespace_end(&class.namespaces) {
+        builder.add_line(namespace_end.as_str());
+    }
+
+    builder.build()
+}
+
+fn namespace_start(namespaces: &[clang::Entity]) -> Option<String> {
+    if namespaces.is_empty() {
+        None
+    } else {
+        Some(
+            namespaces
+                .iter()
+                .map(|namespace| {
+                    format!(
+                        "namespace {} {{",
+                        namespace.get_name().expect("Namespace should have a name")
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(" "),
+        )
+    }
+}
+
+fn namespace_end(namespaces: &[clang::Entity]) -> Option<String> {
+    if namespaces.is_empty() {
+        None
+    } else {
+        Some("}".repeat(namespaces.len()))
+    }
+}
+
+fn method_return_type(method: &clang::Entity) -> String {
+    method
+        .get_result_type()
+        .expect("Method should have a return type")
+        .get_display_name()
+}
+
+fn method_arguments(method: &clang::Entity) -> Vec<String> {
+    method
+        .get_arguments()
+        .expect("Method should have arguments")
+        .iter()
+        .map(|arg| {
+            format!(
+                "{} {}",
+                arg.get_type()
+                    .expect("Argument should have a type")
+                    .get_display_name(),
+                arg.get_display_name().expect("Argument should have a name")
+            )
+        })
+        .collect()
+}
