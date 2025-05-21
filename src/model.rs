@@ -11,9 +11,7 @@ impl<'a> ClassToMock<'a> {
             .get_children()
             .iter()
             .filter(|child| {
-                child.get_kind() == clang::EntityKind::Method
-                    && child.get_accessibility() == Some(clang::Accessibility::Public)
-                    && !child.is_static_method()
+                child.get_kind() == clang::EntityKind::Method && child.is_virtual_method()
             })
             .copied()
             .collect()
