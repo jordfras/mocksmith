@@ -95,6 +95,11 @@ fn method_qualifiers(method: &clang::Entity) -> Vec<String> {
     if method.is_const_method() {
         qualifiers.push("const".to_string());
     }
+    if let Some(exception_specification) = method.get_exception_specification() {
+        if exception_specification == clang::ExceptionSpecification::BasicNoexcept {
+            qualifiers.push("noexcept".to_string());
+        }
+    }
     if method.is_virtual_method() {
         qualifiers.push("override".to_string());
     }
