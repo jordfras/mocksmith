@@ -20,10 +20,11 @@ pub fn generate_mock(
     builder.push_indent();
     for method in class.methods() {
         builder.add_line(&format!(
-            "MOCK_METHOD({}, {}, ({}), (override));",
+            "MOCK_METHOD({}, {}, ({}), ({}));",
             method_return_type(&method),
             method.get_name().expect("Method should have a name"),
-            method_arguments(&method).join(", ")
+            method_arguments(&method).join(", "),
+            method_qualifiers(&method).join(", ")
         ));
     }
     builder.pop_indent();
@@ -87,4 +88,15 @@ fn method_arguments(method: &clang::Entity) -> Vec<String> {
             }
         })
         .collect()
+}
+
+fn method_qualifiers(method: &clang::Entity) -> Vec<String> {
+    let mut qualifiers = Vec::new();
+    if method.is_const_method() {
+        qualifiers.push("const".to_string());
+    }
+    if method.is_virtual_method() {
+        qualifiers.push("override".to_string());
+    }
+    qualifiers
 }
