@@ -76,13 +76,15 @@ fn method_arguments(method: &clang::Entity) -> Vec<String> {
         .expect("Method should have arguments")
         .iter()
         .map(|arg| {
-            format!(
-                "{} {}",
-                arg.get_type()
-                    .expect("Argument should have a type")
-                    .get_display_name(),
-                arg.get_display_name().expect("Argument should have a name")
-            )
+            let type_name = arg
+                .get_type()
+                .expect("Argument should have a type")
+                .get_display_name();
+            if let Some(arg_name) = arg.get_name() {
+                format!("{} {}", type_name, arg_name)
+            } else {
+                type_name
+            }
         })
         .collect()
 }
