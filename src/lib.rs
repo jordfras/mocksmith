@@ -28,11 +28,37 @@ impl MockSmith {
             })
             .collect()
     }
+
+    pub fn create_mocks_from_string(&self, content: &str) -> Vec<String> {
+        let index = clang::Index::new(&self.clang, true, false);
+        let tu = tu_from_string(&index, content);
+        let classes = model::classes_in_translation_unit(&tu);
+        classes
+            .iter()
+            .map(|class| {
+                generate::generate_mock(builder::CodeBuilder::new(2), &class, &mock_name(class))
+            })
+            .collect()
+    }
 }
 
 pub fn tu_from_file<'a>(index: &'a clang::Index<'_>, file: &Path) -> clang::TranslationUnit<'a> {
     index
         .parser(file)
+        .arguments(&["--language=c++"])
+        .parse()
+        .expect("Failed to parse translation unit")
+}
+
+pub fn tu_from_string<'a>(
+    index: &'a clang::Index<'_>,
+    content: &str,
+) -> clang::TranslationUnit<'a> {
+    // Use `Unsaved` with dummy file name
+    let unsaved = clang::Unsaved::new(Path::new("nofile.h"), content);
+    index
+        .parser("nofile.h")
+        .unsaved(&[unsaved])
         .arguments(&["--language=c++"])
         .parse()
         .expect("Failed to parse translation unit")
