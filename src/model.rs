@@ -48,7 +48,7 @@ impl<'a> AstTraverser<'a> {
     fn traverse_recursive(&mut self, entity: clang::Entity<'a>) {
         match entity.get_kind() {
             clang::EntityKind::ClassDecl => {
-                if entity.is_definition() {
+                if entity.is_definition() && has_virtual_methods(&entity) {
                     let class = ClassToMock {
                         class: entity,
                         namespaces: self.namespace_stack.clone(),
@@ -74,4 +74,11 @@ impl<'a> AstTraverser<'a> {
             self.namespace_stack.pop();
         }
     }
+}
+
+fn has_virtual_methods(class: &clang::Entity) -> bool {
+    class
+        .get_children()
+        .iter()
+        .any(|child| child.get_kind() == clang::EntityKind::Method && child.is_virtual_method())
 }
