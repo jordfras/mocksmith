@@ -12,6 +12,12 @@ pub struct MockSmith {
     indent_level: usize,
 }
 
+impl Default for MockSmith {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockSmith {
     pub fn new() -> Self {
         Self {
