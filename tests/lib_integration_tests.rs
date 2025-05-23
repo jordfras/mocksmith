@@ -236,3 +236,35 @@ fn mocks_can_be_generated_from_file() {
         )
     );
 }
+
+#[test]
+fn setting_include_path_finds_types_in_headers() {
+    let temp_header = temp_file("enum MyEnum { VALUE = 1 };");
+    let header_name = temp_header.path().file_name().unwrap().to_str().unwrap();
+
+    let _guard = IN_SERIAL.lock().unwrap();
+    // Include path must be set to the directory of the header file.
+    let mocksmith = MockSmith::new().include_path(temp_header.path().parent().unwrap());
+    assert_mocks!(
+        mocksmith.create_mocks_from_string(
+            format!(
+                "
+                #include \"{header_name}\"
+                class Foo {{
+                public:
+                 virtual ~Foo() = default;
+                 virtual void bar(MyEnum arg) = 0;
+                 virtual MyEnum fizz() = 0;
+                }};"
+            )
+            .as_str()
+        ),
+        lines!(
+            "class MockFoo : public Foo"
+            "{"
+            "public:"
+            "  MOCK_METHOD(void, bar, (MyEnum arg), (override));"
+            "  MOCK_METHOD(MyEnum, fizz, (), (override));"
+            "};")
+    );
+}
