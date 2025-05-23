@@ -64,11 +64,21 @@ fn namespace_end(namespaces: &[clang::Entity]) -> Option<String> {
     }
 }
 
+fn wrap_with_parentheses_if_contains_comma(return_type_or_arg: String) -> String {
+    if return_type_or_arg.contains(',') {
+        format!("({return_type_or_arg})")
+    } else {
+        return_type_or_arg.to_string()
+    }
+}
+
 fn method_return_type(method: &clang::Entity) -> String {
-    method
-        .get_result_type()
-        .expect("Method should have a return type")
-        .get_display_name()
+    wrap_with_parentheses_if_contains_comma(
+        method
+            .get_result_type()
+            .expect("Method should have a return type")
+            .get_display_name(),
+    )
 }
 
 fn method_arguments(method: &clang::Entity) -> Vec<String> {
@@ -87,6 +97,7 @@ fn method_arguments(method: &clang::Entity) -> Vec<String> {
                 type_name
             }
         })
+        .map(wrap_with_parentheses_if_contains_comma)
         .collect()
 }
 
