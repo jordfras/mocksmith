@@ -1,7 +1,7 @@
 use crate::builder;
 use crate::model;
 
-pub fn generate_mock(
+pub(crate) fn generate_mock(
     mut builder: builder::CodeBuilder,
     class: &model::ClassToMock,
     mock_name: &str,

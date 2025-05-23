@@ -1,12 +1,12 @@
 // Represents a class that shall be mocked
 #[derive(Debug)]
-pub struct ClassToMock<'a> {
-    pub class: clang::Entity<'a>,
-    pub namespaces: Vec<clang::Entity<'a>>,
+pub(crate) struct ClassToMock<'a> {
+    pub(crate) class: clang::Entity<'a>,
+    pub(crate) namespaces: Vec<clang::Entity<'a>>,
 }
 
 impl<'a> ClassToMock<'a> {
-    pub fn methods(&self) -> Vec<clang::Entity<'a>> {
+    pub(crate) fn methods(&self) -> Vec<clang::Entity<'a>> {
         self.class
             .get_children()
             .iter()
@@ -19,7 +19,7 @@ impl<'a> ClassToMock<'a> {
 }
 
 // Finds classes to mock in the main file of a translation unit
-pub fn classes_in_translation_unit<'a>(
+pub(crate) fn classes_in_translation_unit<'a>(
     root: &'a clang::TranslationUnit<'a>,
 ) -> Vec<ClassToMock<'a>> {
     AstTraverser::new(root).traverse()
