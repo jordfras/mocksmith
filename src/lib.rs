@@ -7,6 +7,8 @@ use std::path::Path;
 /// MockSmith is a struct for generating Google Mock mocks for C++ classes.
 pub struct MockSmith {
     clang: clang::Clang,
+
+    indent_level: usize,
 }
 
 impl MockSmith {
@@ -14,29 +16,35 @@ impl MockSmith {
         Self {
             clang: clang::Clang::new()
                 .unwrap_or_else(|message| panic!("Could not create Clang: {}", message)),
+            indent_level: 2,
         }
+    }
+
+    pub fn indent_level(mut self, indent_level: usize) -> Self {
+        self.indent_level = indent_level;
+        self
     }
 
     pub fn create_mocks_for_file(&self, file: &Path) -> Vec<String> {
         let index = clang::Index::new(&self.clang, true, false);
-        let tu = tu_from_file(&index, file);
-        let classes = model::classes_in_translation_unit(&tu);
-        classes
-            .iter()
-            .map(|class| {
-                generate::generate_mock(builder::CodeBuilder::new(2), &class, &mock_name(class))
-            })
-            .collect()
+        self.create_mocks(tu_from_file(&index, file))
     }
 
     pub fn create_mocks_from_string(&self, content: &str) -> Vec<String> {
         let index = clang::Index::new(&self.clang, true, false);
-        let tu = tu_from_string(&index, content);
+        self.create_mocks(tu_from_string(&index, content))
+    }
+
+    fn create_mocks(&self, tu: clang::TranslationUnit) -> Vec<String> {
         let classes = model::classes_in_translation_unit(&tu);
         classes
             .iter()
             .map(|class| {
-                generate::generate_mock(builder::CodeBuilder::new(2), &class, &mock_name(class))
+                generate::generate_mock(
+                    builder::CodeBuilder::new(self.indent_level),
+                    &class,
+                    &mock_name(class),
+                )
             })
             .collect()
     }
