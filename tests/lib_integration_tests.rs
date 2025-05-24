@@ -214,6 +214,28 @@ fn configured_indent_level_is_used() {
 }
 
 #[test]
+fn configured_mock_name_function_is_used() {
+    let _guard = IN_SERIAL.lock().unwrap();
+    let mocksmith = MockSmith::new().mock_name_fun(|class_name| format!("Smith{}", class_name));
+    let cpp_class = "
+          class Foo {
+          public:
+            virtual ~Foo() = default;
+            virtual void bar() = 0;
+          };";
+    assert_mocks!(
+        mocksmith.create_mocks_from_string(cpp_class),
+        lines!(
+            "class SmithFoo : public Foo"
+            "{"
+            "public:"
+            "  MOCK_METHOD(void, bar, (), (override));"
+            "};"
+        )
+    );
+}
+
+#[test]
 fn mocks_can_be_generated_from_file() {
     let file = temp_file(
         "

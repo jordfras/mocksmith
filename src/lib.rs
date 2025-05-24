@@ -10,6 +10,7 @@ pub struct MockSmith {
 
     include_paths: Vec<PathBuf>,
     indent_level: usize,
+    name_mock: fn(class_name: String) -> String,
 }
 
 impl Default for MockSmith {
@@ -24,6 +25,7 @@ impl MockSmith {
             clang: clang::Clang::new()
                 .unwrap_or_else(|message| panic!("Could not create Clang: {}", message)),
             include_paths: Vec::new(),
+            name_mock: default_name_mock,
             indent_level: 2,
         }
     }
@@ -38,6 +40,12 @@ impl MockSmith {
     /// Sets the indent level for the generated code. Default is 2 spaces.
     pub fn indent_level(mut self, indent_level: usize) -> Self {
         self.indent_level = indent_level;
+        self
+    }
+
+    /// Sets a custom function to generate mock names based on class names.
+    pub fn mock_name_fun(mut self, name_mock: fn(class_name: String) -> String) -> Self {
+        self.name_mock = name_mock;
         self
     }
 
@@ -61,7 +69,7 @@ impl MockSmith {
                 generate::generate_mock(
                     builder::CodeBuilder::new(self.indent_level),
                     class,
-                    &mock_name(class),
+                    &(self.name_mock)(class.class.get_name().expect("Class should have a name")),
                 )
             })
             .collect()
@@ -107,9 +115,52 @@ impl MockSmith {
     }
 }
 
-fn mock_name(class: &model::ClassToMock<'_>) -> String {
-    format!(
-        "Mock{}",
-        class.class.get_name().expect("Class should have a name")
-    )
+/// Default function to generate mock names.
+///
+/// This function generates a mock name by stripping common prefixes or suffixes like
+/// "Interface", "Ifc", or "I" from the class name and prepending "Mock" to it.
+pub fn default_name_mock(class_name: String) -> String {
+    if class_name.ends_with("Interface") {
+        format!("Mock{}", class_name.strip_suffix("Interface").unwrap())
+    } else if class_name.ends_with("Ifc") {
+        format!("Mock{}", class_name.strip_suffix("Ifc").unwrap())
+    } else if class_name.starts_with("Interface") {
+        format!("Mock{}", class_name.strip_prefix("Interface").unwrap())
+    } else if class_name.starts_with("Ifc") {
+        format!("Mock{}", class_name.strip_prefix("Ifc").unwrap())
+    } else if class_name.starts_with("I")
+        && class_name.len() > 1
+        && class_name.chars().nth(1).unwrap().is_uppercase()
+    {
+        format!("Mock{}", class_name.strip_prefix("I").unwrap())
+    } else {
+        format!("Mock{}", class_name)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_name_mock() {
+        assert_eq!(
+            default_name_mock("MyTypeInterface".to_string()),
+            "MockMyType"
+        );
+        assert_eq!(default_name_mock("MyTypeIfc".to_string()), "MockMyType");
+        assert_eq!(
+            default_name_mock("InterfaceMyType".to_string()),
+            "MockMyType"
+        );
+        assert_eq!(default_name_mock("IfcMyType".to_string()), "MockMyType");
+        assert_eq!(default_name_mock("IMyType".to_string()), "MockMyType");
+
+        assert_eq!(default_name_mock("MyType".to_string()), "MockMyType");
+        assert_eq!(
+            default_name_mock("InterestingType".to_string()),
+            "MockInterestingType"
+        );
+        assert_eq!(default_name_mock("I".to_string()), "MockI");
+    }
 }
