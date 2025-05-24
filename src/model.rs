@@ -10,9 +10,7 @@ impl<'a> ClassToMock<'a> {
         self.class
             .get_children()
             .iter()
-            .filter(|child| {
-                child.get_kind() == clang::EntityKind::Method && child.is_virtual_method()
-            })
+            .filter(|child| child.get_kind() == clang::EntityKind::Method)
             .copied()
             .collect()
     }
@@ -21,20 +19,27 @@ impl<'a> ClassToMock<'a> {
 // Finds classes to mock in the main file of a translation unit
 pub(crate) fn classes_in_translation_unit<'a>(
     root: &'a clang::TranslationUnit<'a>,
+    methods_to_mock: crate::MethodsToMock,
 ) -> Vec<ClassToMock<'a>> {
-    AstTraverser::new(root).traverse()
+    AstTraverser::new(root, methods_to_mock).traverse()
 }
 
 struct AstTraverser<'a> {
     root: clang::Entity<'a>,
+    methods_to_mock: crate::MethodsToMock,
+
     classes: Vec<ClassToMock<'a>>,
     namespace_stack: Vec<clang::Entity<'a>>,
 }
 
 impl<'a> AstTraverser<'a> {
-    pub fn new(root: &'a clang::TranslationUnit<'a>) -> Self {
+    pub fn new(
+        root: &'a clang::TranslationUnit<'a>,
+        methods_to_mock: crate::MethodsToMock,
+    ) -> Self {
         Self {
             root: root.get_entity(),
+            methods_to_mock,
             classes: Vec::new(),
             namespace_stack: Vec::new(),
         }
@@ -48,7 +53,7 @@ impl<'a> AstTraverser<'a> {
     fn traverse_recursive(&mut self, entity: clang::Entity<'a>) {
         match entity.get_kind() {
             clang::EntityKind::ClassDecl => {
-                if entity.is_definition() && has_virtual_methods(&entity) {
+                if entity.is_definition() && self.should_mock_class(&entity) {
                     let class = ClassToMock {
                         class: entity,
                         namespaces: self.namespace_stack.clone(),
@@ -74,11 +79,10 @@ impl<'a> AstTraverser<'a> {
             self.namespace_stack.pop();
         }
     }
-}
 
-fn has_virtual_methods(class: &clang::Entity) -> bool {
-    class
-        .get_children()
-        .iter()
-        .any(|child| child.get_kind() == clang::EntityKind::Method && child.is_virtual_method())
+    fn should_mock_class(&self, class: &clang::Entity) -> bool {
+        class.get_children().iter().any(|child| {
+            child.get_kind() == clang::EntityKind::Method && self.methods_to_mock.should_mock(child)
+        })
+    }
 }

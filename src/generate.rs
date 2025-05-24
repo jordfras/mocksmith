@@ -4,6 +4,7 @@ use crate::model;
 pub(crate) fn generate_mock(
     mut builder: builder::CodeBuilder,
     class: &model::ClassToMock,
+    methods_to_mock: crate::MethodsToMock,
     mock_name: &str,
 ) -> String {
     if let Some(namespace_start) = namespace_start(&class.namespaces) {
@@ -18,15 +19,19 @@ pub(crate) fn generate_mock(
     builder.add_line("{");
     builder.add_line("public:");
     builder.push_indent();
-    for method in class.methods() {
-        builder.add_line(&format!(
-            "MOCK_METHOD({}, {}, ({}), ({}));",
-            method_return_type(&method),
-            method.get_name().expect("Method should have a name"),
-            method_arguments(&method).join(", "),
-            method_qualifiers(&method).join(", ")
-        ));
-    }
+    class
+        .methods()
+        .iter()
+        .filter(|method| methods_to_mock.should_mock(method))
+        .for_each(|method| {
+            builder.add_line(&format!(
+                "MOCK_METHOD({}, {}, ({}), ({}));",
+                method_return_type(method),
+                method.get_name().expect("Method should have a name"),
+                method_arguments(method).join(", "),
+                method_qualifiers(method).join(", ")
+            ));
+        });
     builder.pop_indent();
     builder.add_line("};");
 

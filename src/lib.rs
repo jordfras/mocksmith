@@ -4,11 +4,33 @@ mod model;
 
 use std::path::{Path, PathBuf};
 
+/// Enum to control which methods to mock in a class.
+#[derive(Clone, Copy)]
+pub enum MethodsToMock {
+    /// Mock all functions, including non-virtual ones.
+    All,
+    /// Mock only virtual functions, including pure virtual ones.
+    AllVirtual,
+    /// Mock only pure virtual functions.
+    OnlyPureVirtual,
+}
+
+impl MethodsToMock {
+    fn should_mock(self, method: &clang::Entity) -> bool {
+        match self {
+            MethodsToMock::All => !method.is_static_method(),
+            MethodsToMock::AllVirtual => method.is_virtual_method(),
+            MethodsToMock::OnlyPureVirtual => method.is_pure_virtual_method(),
+        }
+    }
+}
+
 /// MockSmith is a struct for generating Google Mock mocks for C++ classes.
 pub struct MockSmith {
     clang: clang::Clang,
 
     include_paths: Vec<PathBuf>,
+    methods_to_mock: MethodsToMock,
     indent_level: usize,
     name_mock: fn(class_name: String) -> String,
 }
@@ -25,6 +47,7 @@ impl MockSmith {
             clang: clang::Clang::new()
                 .unwrap_or_else(|message| panic!("Could not create Clang: {}", message)),
             include_paths: Vec::new(),
+            methods_to_mock: MethodsToMock::AllVirtual,
             name_mock: default_name_mock,
             indent_level: 2,
         }
@@ -34,6 +57,13 @@ impl MockSmith {
     /// paths are set, the current directory is used.
     pub fn include_path(mut self, include_path: &Path) -> Self {
         self.include_paths.push(include_path.to_path_buf());
+        self
+    }
+
+    /// Sets which methods to mock in the classes. Default is `AllVirtual`, which mocks
+    /// all virtual methods.
+    pub fn methods_to_mock(mut self, functions: MethodsToMock) -> Self {
+        self.methods_to_mock = functions;
         self
     }
 
@@ -62,13 +92,14 @@ impl MockSmith {
     }
 
     fn create_mocks(&self, tu: clang::TranslationUnit) -> Vec<String> {
-        let classes = model::classes_in_translation_unit(&tu);
+        let classes = model::classes_in_translation_unit(&tu, self.methods_to_mock);
         classes
             .iter()
             .map(|class| {
                 generate::generate_mock(
                     builder::CodeBuilder::new(self.indent_level),
                     class,
+                    self.methods_to_mock,
                     &(self.name_mock)(class.class.get_name().expect("Class should have a name")),
                 )
             })

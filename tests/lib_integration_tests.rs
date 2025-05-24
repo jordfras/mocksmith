@@ -290,3 +290,121 @@ fn setting_include_path_finds_types_in_headers() {
             "};")
     );
 }
+
+#[test]
+fn generate_all_functions_mocks_non_virtual_functions() {
+    let _guard = IN_SERIAL.lock().unwrap();
+    let mocksmith = MockSmith::new().methods_to_mock(mocksmith::MethodsToMock::All);
+
+    // Class with only non-virtual functions can be found and mocked
+    let cpp_class = "
+          class Foo {
+          public:
+            void bar() {}
+          };";
+    assert_mocks!(
+        mocksmith.create_mocks_from_string(cpp_class),
+        lines!(
+            "class MockFoo : public Foo"
+            "{"
+            "public:"
+            "  MOCK_METHOD(void, bar, (), ());"
+            "};"
+        )
+    );
+
+    // Class with virtual functions is also found and mocked
+    let cpp_class = "
+          class Foo {
+          public:
+            virtual ~Foo() = default;
+            void bar() {}
+            virtual void fizz() {}
+            virtual void buzz() = 0;
+            static void qux() {}
+          };";
+    assert_mocks!(
+        mocksmith.create_mocks_from_string(cpp_class),
+        lines!(
+            "class MockFoo : public Foo"
+            "{"
+            "public:"
+            "  MOCK_METHOD(void, bar, (), ());"
+            "  MOCK_METHOD(void, fizz, (), (override));"
+            "  MOCK_METHOD(void, buzz, (), (override));"
+            "};"
+        )
+    );
+}
+
+#[test]
+fn generate_all_virtual_functions_mocks_virtual_functions_only() {
+    let _guard = IN_SERIAL.lock().unwrap();
+    let mocksmith = MockSmith::new().methods_to_mock(mocksmith::MethodsToMock::AllVirtual);
+
+    // Class with only non-virtual functions is ignored
+    let cpp_class = "
+          class Foo {
+          public:
+            void bar() {}
+          };";
+    assert!(mocksmith.create_mocks_from_string(cpp_class).is_empty());
+
+    // Class with virtual functions is also found and virtual functions are mocked
+    let cpp_class = "
+          class Foo {
+          public:
+            virtual ~Foo() = default;
+            void bar() {}
+            virtual void fizz() {}
+            virtual void buzz() = 0;
+            static void qux() {}
+          };";
+    assert_mocks!(
+        mocksmith.create_mocks_from_string(cpp_class),
+        lines!(
+            "class MockFoo : public Foo"
+            "{"
+            "public:"
+            "  MOCK_METHOD(void, fizz, (), (override));"
+            "  MOCK_METHOD(void, buzz, (), (override));"
+            "};"
+        )
+    );
+}
+
+#[test]
+fn generate_pure_virtual_functions_mocks_pure_virtual_functions_only() {
+    let _guard = IN_SERIAL.lock().unwrap();
+    let mocksmith = MockSmith::new().methods_to_mock(mocksmith::MethodsToMock::OnlyPureVirtual);
+
+    // Class with non pure virtual functions is ignored
+    let cpp_class = "
+          class Foo {
+          public:
+            void bar() {}
+            virtual void fizz() {} 
+          };";
+    assert!(mocksmith.create_mocks_from_string(cpp_class).is_empty());
+
+    // Class with pure virtual functions is found and pure virtual functions are mocked
+    let cpp_class = "
+          class Foo {
+          public:
+            virtual ~Foo() = default;
+            void bar() {}
+            virtual void fizz() {}
+            virtual void buzz() = 0;
+            static void qux() {}
+          };";
+    assert_mocks!(
+        mocksmith.create_mocks_from_string(cpp_class),
+        lines!(
+            "class MockFoo : public Foo"
+            "{"
+            "public:"
+            "  MOCK_METHOD(void, buzz, (), (override));"
+            "};"
+        )
+    );
+}
