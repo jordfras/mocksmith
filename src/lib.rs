@@ -2,7 +2,10 @@ mod builder;
 mod generate;
 mod model;
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::{Mutex, MutexGuard, TryLockError},
+};
 
 /// Enum to control which methods to mock in a class.
 #[derive(Clone, Copy)]
@@ -25,8 +28,13 @@ impl MethodsToMock {
     }
 }
 
+// Ensure Clang is initialized in only one thread at a time. The clang::Clang struct
+// cannot be put in a LazyLock<Mutex<>> itself.
+static CLANG_MUTEX: Mutex<()> = Mutex::new(());
+
 /// MockSmith is a struct for generating Google Mock mocks for C++ classes.
 pub struct MockSmith {
+    _clang_lock: MutexGuard<'static, ()>,
     clang: clang::Clang,
 
     include_paths: Vec<PathBuf>,
@@ -35,22 +43,49 @@ pub struct MockSmith {
     name_mock: fn(class_name: String) -> String,
 }
 
-impl Default for MockSmith {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl MockSmith {
-    pub fn new() -> Self {
-        Self {
+    /// Creates a new MockSmith instance.
+    ///
+    /// The function fails if another thread already holds an instance, since Clang can
+    /// only be used from one thread.
+    pub fn new() -> Result<Self, String> {
+        let clang_lock = match CLANG_MUTEX.try_lock() {
+            Ok(lock) => lock,
+            Err(TryLockError::WouldBlock) => {
+                return Err("MockSmith object already created in another thread".to_string());
+            }
+            Err(TryLockError::Poisoned(_)) => {
+                return Err("Another thread using MockSmith panicked".to_string());
+            }
+        };
+        Ok(Self {
+            _clang_lock: clang_lock,
             clang: clang::Clang::new()
-                .unwrap_or_else(|message| panic!("Could not create Clang: {}", message)),
+                .map_err(|message| format!("Could not access Clang: {}", message))?,
             include_paths: Vec::new(),
             methods_to_mock: MethodsToMock::AllVirtual,
             name_mock: default_name_mock,
             indent_level: 2,
-        }
+        })
+    }
+
+    /// Creates a new MockSmith instance.
+    ///
+    /// The function waits for any other thread holding an instance to release its
+    /// instance before returning since Clang can only be used from one thread.
+    pub fn new_when_available() -> Result<Self, String> {
+        let Ok(clang_lock) = CLANG_MUTEX.lock() else {
+            return Err("Another thread using MockSmith panicked".to_string());
+        };
+        Ok(Self {
+            _clang_lock: clang_lock,
+            clang: clang::Clang::new()
+                .map_err(|message| format!("Could not access Clang: {}", message))?,
+            include_paths: Vec::new(),
+            methods_to_mock: MethodsToMock::AllVirtual,
+            name_mock: default_name_mock,
+            indent_level: 2,
+        })
     }
 
     /// Adds an include path to the list of paths to search for headers. If no include
@@ -193,5 +228,24 @@ mod tests {
             "MockInterestingType"
         );
         assert_eq!(default_name_mock("I".to_string()), "MockI");
+    }
+
+    #[test]
+    fn test_new_with_threads() {
+        let mocksmith = MockSmith::new().unwrap();
+
+        let handle = std::thread::spawn(|| {
+            let _expected_error: Result<MockSmith, String> =
+                Err("MockSmith object already created in another thread".to_string());
+            assert!(matches!(MockSmith::new(), _expected_error));
+        });
+        handle.join().unwrap();
+
+        let handle = std::thread::spawn(|| {
+            let _mocksmith = MockSmith::new_when_available().unwrap();
+        });
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        std::mem::drop(mocksmith);
+        handle.join().unwrap();
     }
 }

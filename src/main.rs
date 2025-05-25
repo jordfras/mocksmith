@@ -3,7 +3,8 @@ use std::io::Read;
 use mocksmith::MockSmith;
 
 fn main() {
-    let mocksmith = MockSmith::new();
+    let mocksmith = MockSmith::new()
+        .unwrap_or_else(|message| panic!("Could not create MockSmith instance: {message}"));
 
     if std::env::args().len() == 1 {
         let mut content = String::new();

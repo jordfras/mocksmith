@@ -2,16 +2,10 @@ mod helpers;
 
 use helpers::temp_file;
 use mocksmith::MockSmith;
-use std::sync::Mutex;
-
-// Mutex needs to be locked in beginning of each test to avoid running in parallel.
-// clang::Clang can only be used from one thread at a time.
-static IN_SERIAL: Mutex<()> = Mutex::new(());
 
 #[test]
 fn simple_pure_virtual_function_can_be_mocked() {
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new();
+    let mocksmith = MockSmith::new_when_available().unwrap();
     let cpp_class = "
           class Foo {
           public:
@@ -32,8 +26,7 @@ fn simple_pure_virtual_function_can_be_mocked() {
 
 #[test]
 fn simple_non_virtual_function_is_ignored() {
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new();
+    let mocksmith = MockSmith::new_when_available().unwrap();
     let cpp_class = "
           class Foo {
           public:
@@ -44,8 +37,7 @@ fn simple_non_virtual_function_is_ignored() {
 
 #[test]
 fn various_return_types_and_argument_types_can_be_mocked() {
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new();
+    let mocksmith = MockSmith::new_when_available().unwrap();
     let cpp_class = "
           #include <string>
           #include <cstdint>
@@ -70,8 +62,7 @@ fn various_return_types_and_argument_types_can_be_mocked() {
 
 #[test]
 fn noexcept_and_const_qualifiers_are_added_when_needed() {
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new();
+    let mocksmith = MockSmith::new_when_available().unwrap();
     let cpp_class = "
           #include <string>
           #include <cstdint>
@@ -98,8 +89,7 @@ fn noexcept_and_const_qualifiers_are_added_when_needed() {
 
 #[test]
 fn types_with_commas_are_wrapped_with_parenthesis() {
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new();
+    let mocksmith = MockSmith::new_when_available().unwrap();
     let cpp_class = "
           #include <map>
           class Foo {
@@ -123,8 +113,7 @@ fn types_with_commas_are_wrapped_with_parenthesis() {
 
 #[test]
 fn protected_and_private_methods_are_mocked_as_public() {
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new();
+    let mocksmith = MockSmith::new_when_available().unwrap();
     let cpp_class = "
           #include <map>
           class Foo {
@@ -152,8 +141,7 @@ fn protected_and_private_methods_are_mocked_as_public() {
 
 #[test]
 fn unknown_argument_type_is_mocked_as_int() {
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new();
+    let mocksmith = MockSmith::new_when_available().unwrap();
     let cpp_class = "
           class Foo {
           public:
@@ -178,8 +166,7 @@ fn unknown_argument_type_is_mocked_as_int() {
 
 #[test]
 fn unknown_return_type_is_treated_as_non_virtual_function() {
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new();
+    let mocksmith = MockSmith::new_when_available().unwrap();
     let cpp_class = "
           class Foo {
           public:
@@ -193,8 +180,7 @@ fn unknown_return_type_is_treated_as_non_virtual_function() {
 
 #[test]
 fn configured_indent_level_is_used() {
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new().indent_level(4);
+    let mocksmith = MockSmith::new_when_available().unwrap().indent_level(4);
     let cpp_class = "
           class Foo {
           public:
@@ -215,8 +201,9 @@ fn configured_indent_level_is_used() {
 
 #[test]
 fn configured_mock_name_function_is_used() {
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new().mock_name_fun(|class_name| format!("Smith{}", class_name));
+    let mocksmith = MockSmith::new_when_available()
+        .unwrap()
+        .mock_name_fun(|class_name| format!("Smith{}", class_name));
     let cpp_class = "
           class Foo {
           public:
@@ -245,8 +232,7 @@ fn mocks_can_be_generated_from_file() {
           virtual void bar() = 0;
         };",
     );
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new();
+    let mocksmith = MockSmith::new_when_available().unwrap();
     assert_mocks!(
         mocksmith.create_mocks_for_file(file.path()),
         lines!(
@@ -264,9 +250,10 @@ fn setting_include_path_finds_types_in_headers() {
     let temp_header = temp_file("enum MyEnum { VALUE = 1 };");
     let header_name = temp_header.path().file_name().unwrap().to_str().unwrap();
 
-    let _guard = IN_SERIAL.lock().unwrap();
     // Include path must be set to the directory of the header file.
-    let mocksmith = MockSmith::new().include_path(temp_header.path().parent().unwrap());
+    let mocksmith = MockSmith::new_when_available()
+        .unwrap()
+        .include_path(temp_header.path().parent().unwrap());
     assert_mocks!(
         mocksmith.create_mocks_from_string(
             format!(
@@ -293,8 +280,9 @@ fn setting_include_path_finds_types_in_headers() {
 
 #[test]
 fn generate_all_functions_mocks_non_virtual_functions() {
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new().methods_to_mock(mocksmith::MethodsToMock::All);
+    let mocksmith = MockSmith::new_when_available()
+        .unwrap()
+        .methods_to_mock(mocksmith::MethodsToMock::All);
 
     // Class with only non-virtual functions can be found and mocked
     let cpp_class = "
@@ -339,8 +327,9 @@ fn generate_all_functions_mocks_non_virtual_functions() {
 
 #[test]
 fn generate_all_virtual_functions_mocks_virtual_functions_only() {
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new().methods_to_mock(mocksmith::MethodsToMock::AllVirtual);
+    let mocksmith = MockSmith::new_when_available()
+        .unwrap()
+        .methods_to_mock(mocksmith::MethodsToMock::AllVirtual);
 
     // Class with only non-virtual functions is ignored
     let cpp_class = "
@@ -375,8 +364,9 @@ fn generate_all_virtual_functions_mocks_virtual_functions_only() {
 
 #[test]
 fn generate_pure_virtual_functions_mocks_pure_virtual_functions_only() {
-    let _guard = IN_SERIAL.lock().unwrap();
-    let mocksmith = MockSmith::new().methods_to_mock(mocksmith::MethodsToMock::OnlyPureVirtual);
+    let mocksmith = MockSmith::new_when_available()
+        .unwrap()
+        .methods_to_mock(mocksmith::MethodsToMock::OnlyPureVirtual);
 
     // Class with non pure virtual functions is ignored
     let cpp_class = "
