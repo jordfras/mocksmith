@@ -7,6 +7,16 @@ use std::{
     sync::{Mutex, MutexGuard, TryLockError},
 };
 
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub enum MocksmithError {
+    #[error("Another thread is already using Mocksmith")]
+    Busy,
+    #[error("Another thread using Mocksmith panicked")]
+    Poisoned,
+    #[error("Could not access Clang: {0}")]
+    ClangError(String),
+}
+
 /// Enum to control which methods to mock in a class.
 #[derive(Clone, Copy)]
 pub enum MethodsToMock {
@@ -48,20 +58,14 @@ impl Mocksmith {
     ///
     /// The function fails if another thread already holds an instance, since Clang can
     /// only be used from one thread.
-    pub fn new() -> Result<Self, String> {
-        let clang_lock = match CLANG_MUTEX.try_lock() {
-            Ok(lock) => lock,
-            Err(TryLockError::WouldBlock) => {
-                return Err("Mocksmith object already created in another thread".to_string());
-            }
-            Err(TryLockError::Poisoned(_)) => {
-                return Err("Another thread using Mocksmith panicked".to_string());
-            }
-        };
+    pub fn new() -> Result<Self, MocksmithError> {
+        let clang_lock = CLANG_MUTEX.try_lock().map_err(|error| match error {
+            TryLockError::WouldBlock => MocksmithError::Busy,
+            TryLockError::Poisoned(_) => MocksmithError::Poisoned,
+        })?;
         Ok(Self {
             _clang_lock: clang_lock,
-            clang: clang::Clang::new()
-                .map_err(|message| format!("Could not access Clang: {}", message))?,
+            clang: clang::Clang::new().map_err(MocksmithError::ClangError)?,
             include_paths: Vec::new(),
             methods_to_mock: MethodsToMock::AllVirtual,
             name_mock: default_name_mock,
@@ -73,14 +77,13 @@ impl Mocksmith {
     ///
     /// The function waits for any other thread holding an instance to release its
     /// instance before returning since Clang can only be used from one thread.
-    pub fn new_when_available() -> Result<Self, String> {
+    pub fn new_when_available() -> Result<Self, MocksmithError> {
         let Ok(clang_lock) = CLANG_MUTEX.lock() else {
-            return Err("Another thread using Mocksmith panicked".to_string());
+            return Err(MocksmithError::Poisoned);
         };
         Ok(Self {
             _clang_lock: clang_lock,
-            clang: clang::Clang::new()
-                .map_err(|message| format!("Could not access Clang: {}", message))?,
+            clang: clang::Clang::new().map_err(MocksmithError::ClangError)?,
             include_paths: Vec::new(),
             methods_to_mock: MethodsToMock::AllVirtual,
             name_mock: default_name_mock,
@@ -235,9 +238,7 @@ mod tests {
         let mocksmith = Mocksmith::new().unwrap();
 
         let handle = std::thread::spawn(|| {
-            let _expected_error: Result<Mocksmith, String> =
-                Err("Mocksmith object already created in another thread".to_string());
-            assert!(matches!(Mocksmith::new(), _expected_error));
+            assert!(matches!(Mocksmith::new(), Err(MocksmithError::Busy)));
         });
         handle.join().unwrap();
 

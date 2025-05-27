@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 clap = { version="4.5", features=["derive"] }
+thiserror = "2.0"
 
 # Use runtime feature to load libclang at runtime. This makes it possible to build without
 # instructing clang-sys where libclang is located. For some reason, clang-sys does a
