@@ -15,7 +15,23 @@ pub enum MocksmithError {
     Poisoned,
     #[error("Could not access Clang: {0}")]
     ClangError(String),
+    #[error("Parse error {}at line {}, column {}: {}",
+            if file.is_none() {
+                String::new()
+            }
+            else {
+                format!(" in file {} ", file.as_ref().unwrap().display())
+            },
+            line, column, message)]
+    ParseError {
+        message: String,
+        file: Option<PathBuf>,
+        line: u32,
+        column: u32,
+    },
 }
+
+pub type Result<T> = std::result::Result<T, MocksmithError>;
 
 /// Enum to control which methods to mock in a class.
 #[derive(Clone, Copy)]
@@ -58,7 +74,7 @@ impl Mocksmith {
     ///
     /// The function fails if another thread already holds an instance, since Clang can
     /// only be used from one thread.
-    pub fn new() -> Result<Self, MocksmithError> {
+    pub fn new() -> Result<Self> {
         let clang_lock = CLANG_MUTEX.try_lock().map_err(|error| match error {
             TryLockError::WouldBlock => MocksmithError::Busy,
             TryLockError::Poisoned(_) => MocksmithError::Poisoned,
@@ -76,10 +92,12 @@ impl Mocksmith {
     /// Creates a new Mocksmith instance.
     ///
     /// The function waits for any other thread holding an instance to release its
-    /// instance before returning since Clang can only be used from one thread.
-    pub fn new_when_available() -> Result<Self, MocksmithError> {
+    /// instance before returning since Clang can only be used from one thread. If a
+    /// thread using Mocksmith panics, the poisoning is cleared.
+    pub fn new_when_available() -> Result<Self> {
         let Ok(clang_lock) = CLANG_MUTEX.lock() else {
-            return Err(MocksmithError::Poisoned);
+            CLANG_MUTEX.clear_poison();
+            return Self::new_when_available();
         };
         Ok(Self {
             _clang_lock: clang_lock,
@@ -118,20 +136,35 @@ impl Mocksmith {
     }
 
     /// Generates mocks for classes in the given file.
-    pub fn create_mocks_for_file(&self, file: &Path) -> Vec<String> {
+    pub fn create_mocks_for_file(&self, file: &Path) -> Result<Vec<String>> {
         let index = clang::Index::new(&self.clang, true, false);
-        self.create_mocks(self.tu_from_file(&index, file))
+        self.create_mocks(self.tu_from_file(&index, file), Some(file))
     }
 
     /// Generates mocks for classes in the given string.
-    pub fn create_mocks_from_string(&self, content: &str) -> Vec<String> {
+    pub fn create_mocks_from_string(&self, content: &str) -> Result<Vec<String>> {
         let index = clang::Index::new(&self.clang, true, false);
-        self.create_mocks(self.tu_from_string(&index, content))
+        self.create_mocks(self.tu_from_string(&index, content), None)
     }
 
-    fn create_mocks(&self, tu: clang::TranslationUnit) -> Vec<String> {
+    fn create_mocks(&self, tu: clang::TranslationUnit, file: Option<&Path>) -> Result<Vec<String>> {
+        if let Some(diagnostic) = tu
+            .get_diagnostics()
+            .iter()
+            .filter(|diagnostic| diagnostic.get_severity() == clang::diagnostic::Severity::Error)
+            .nth(0)
+        {
+            let location = diagnostic.get_location().get_file_location();
+            return Err(MocksmithError::ParseError {
+                message: diagnostic.get_text(),
+                file: file.map(|f| f.to_path_buf()),
+                line: location.line,
+                column: location.column,
+            });
+        }
+
         let classes = model::classes_in_translation_unit(&tu, self.methods_to_mock);
-        classes
+        Ok(classes
             .iter()
             .map(|class| {
                 generate::generate_mock(
@@ -141,7 +174,7 @@ impl Mocksmith {
                     &(self.name_mock)(class.class.get_name().expect("Class should have a name")),
                 )
             })
-            .collect()
+            .collect())
     }
 
     fn tu_from_file<'a>(

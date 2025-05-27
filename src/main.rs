@@ -16,6 +16,10 @@ fn main() {
             });
         mocksmith
             .create_mocks_from_string(&content)
+            .unwrap_or_else(|error| {
+                eprintln!("Error creating mocks from string:\n{error}");
+                std::process::exit(1);
+            })
             .into_iter()
             .for_each(|mock| {
                 println!("{}", mock);
@@ -24,6 +28,10 @@ fn main() {
         for arg in std::env::args().skip(1) {
             mocksmith
                 .create_mocks_for_file(std::path::Path::new(&arg))
+                .unwrap_or_else(|error| {
+                    eprintln!("Error creating mocks from file:\n{error}");
+                    std::process::exit(1);
+                })
                 .into_iter()
                 .for_each(|mock| {
                     println!("{}", mock);

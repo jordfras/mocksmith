@@ -1,7 +1,7 @@
 mod helpers;
 
 use helpers::temp_file;
-use mocksmith::Mocksmith;
+use mocksmith::{Mocksmith, MocksmithError};
 
 #[test]
 fn simple_pure_virtual_function_can_be_mocked() {
@@ -32,7 +32,7 @@ fn simple_non_virtual_function_is_ignored() {
           public:
             void bar();
           };";
-    assert!(mocksmith.create_mocks_from_string(cpp_class).is_empty());
+    assert_no_mocks!(mocksmith.create_mocks_from_string(cpp_class));
 }
 
 #[test]
@@ -140,32 +140,45 @@ fn protected_and_private_methods_are_mocked_as_public() {
 }
 
 #[test]
-fn unknown_argument_type_is_mocked_as_int() {
+fn unknown_argument_type_is_treated_as_error() {
     let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
           class Foo {
           public:
             virtual ~Foo() = default;
             virtual void bar(const Unknown& arg) = 0;
+          };";
+    // When an argument type is not recognized by libclang, it is assumed to be an int.
+    assert_eq!(
+        mocksmith.create_mocks_from_string(cpp_class),
+        Err(MocksmithError::ParseError {
+            message: "unknown type name 'Unknown'".to_string(),
+            file: None,
+            line: 5,
+            column: 36
+        })
+    );
+
+    let cpp_class = "
+          class Foo {
+          public:
+            virtual ~Foo() = default;
             // Include of <string> is missing
             virtual void fizz(const std::string& arg) = 0;
           };";
-    // When an argument type is not recognized by libclang, it is assumed to be an int.
-    assert_mocks!(
+    assert_eq!(
         mocksmith.create_mocks_from_string(cpp_class),
-        lines!(
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "  MOCK_METHOD(void, bar, (const int & arg), (override));"
-            "  MOCK_METHOD(void, fizz, (const int & arg), (override));"
-            "};"
-        )
+        Err(MocksmithError::ParseError {
+            message: "use of undeclared identifier 'std'".to_string(),
+            file: None,
+            line: 6,
+            column: 37
+        })
     );
 }
 
 #[test]
-fn unknown_return_type_is_treated_as_non_virtual_function() {
+fn unknown_return_type_is_treated_as_error() {
     let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
           class Foo {
@@ -175,7 +188,15 @@ fn unknown_return_type_is_treated_as_non_virtual_function() {
           };";
     // When a return type is not recognized by libclang, the function is not marked as
     // virtual. In this case it is then not mocked.
-    assert!(mocksmith.create_mocks_from_string(cpp_class).is_empty());
+    assert_eq!(
+        mocksmith.create_mocks_from_string(cpp_class),
+        Err(MocksmithError::ParseError {
+            message: "unknown type name 'Unknown'".to_string(),
+            file: None,
+            line: 5,
+            column: 21
+        })
+    );
 }
 
 #[test]
@@ -337,7 +358,7 @@ fn generate_all_virtual_functions_mocks_virtual_functions_only() {
           public:
             void bar() {}
           };";
-    assert!(mocksmith.create_mocks_from_string(cpp_class).is_empty());
+    assert_no_mocks!(mocksmith.create_mocks_from_string(cpp_class));
 
     // Class with virtual functions is also found and virtual functions are mocked
     let cpp_class = "
@@ -375,7 +396,7 @@ fn generate_pure_virtual_functions_mocks_pure_virtual_functions_only() {
             void bar() {}
             virtual void fizz() {} 
           };";
-    assert!(mocksmith.create_mocks_from_string(cpp_class).is_empty());
+    assert_no_mocks!(mocksmith.create_mocks_from_string(cpp_class));
 
     // Class with pure virtual functions is found and pure virtual functions are mocked
     let cpp_class = "
