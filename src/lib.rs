@@ -32,8 +32,8 @@ impl MethodsToMock {
 // cannot be put in a LazyLock<Mutex<>> itself.
 static CLANG_MUTEX: Mutex<()> = Mutex::new(());
 
-/// MockSmith is a struct for generating Google Mock mocks for C++ classes.
-pub struct MockSmith {
+/// Mocksmith is a struct for generating Google Mock mocks for C++ classes.
+pub struct Mocksmith {
     _clang_lock: MutexGuard<'static, ()>,
     clang: clang::Clang,
 
@@ -43,8 +43,8 @@ pub struct MockSmith {
     name_mock: fn(class_name: String) -> String,
 }
 
-impl MockSmith {
-    /// Creates a new MockSmith instance.
+impl Mocksmith {
+    /// Creates a new Mocksmith instance.
     ///
     /// The function fails if another thread already holds an instance, since Clang can
     /// only be used from one thread.
@@ -52,10 +52,10 @@ impl MockSmith {
         let clang_lock = match CLANG_MUTEX.try_lock() {
             Ok(lock) => lock,
             Err(TryLockError::WouldBlock) => {
-                return Err("MockSmith object already created in another thread".to_string());
+                return Err("Mocksmith object already created in another thread".to_string());
             }
             Err(TryLockError::Poisoned(_)) => {
-                return Err("Another thread using MockSmith panicked".to_string());
+                return Err("Another thread using Mocksmith panicked".to_string());
             }
         };
         Ok(Self {
@@ -69,13 +69,13 @@ impl MockSmith {
         })
     }
 
-    /// Creates a new MockSmith instance.
+    /// Creates a new Mocksmith instance.
     ///
     /// The function waits for any other thread holding an instance to release its
     /// instance before returning since Clang can only be used from one thread.
     pub fn new_when_available() -> Result<Self, String> {
         let Ok(clang_lock) = CLANG_MUTEX.lock() else {
-            return Err("Another thread using MockSmith panicked".to_string());
+            return Err("Another thread using Mocksmith panicked".to_string());
         };
         Ok(Self {
             _clang_lock: clang_lock,
@@ -232,17 +232,17 @@ mod tests {
 
     #[test]
     fn test_new_with_threads() {
-        let mocksmith = MockSmith::new().unwrap();
+        let mocksmith = Mocksmith::new().unwrap();
 
         let handle = std::thread::spawn(|| {
-            let _expected_error: Result<MockSmith, String> =
-                Err("MockSmith object already created in another thread".to_string());
-            assert!(matches!(MockSmith::new(), _expected_error));
+            let _expected_error: Result<Mocksmith, String> =
+                Err("Mocksmith object already created in another thread".to_string());
+            assert!(matches!(Mocksmith::new(), _expected_error));
         });
         handle.join().unwrap();
 
         let handle = std::thread::spawn(|| {
-            let _mocksmith = MockSmith::new_when_available().unwrap();
+            let _mocksmith = Mocksmith::new_when_available().unwrap();
         });
         std::thread::sleep(std::time::Duration::from_millis(25));
         std::mem::drop(mocksmith);

@@ -1,11 +1,11 @@
 mod helpers;
 
 use helpers::temp_file;
-use mocksmith::MockSmith;
+use mocksmith::Mocksmith;
 
 #[test]
 fn simple_pure_virtual_function_can_be_mocked() {
-    let mocksmith = MockSmith::new_when_available().unwrap();
+    let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
           class Foo {
           public:
@@ -26,7 +26,7 @@ fn simple_pure_virtual_function_can_be_mocked() {
 
 #[test]
 fn simple_non_virtual_function_is_ignored() {
-    let mocksmith = MockSmith::new_when_available().unwrap();
+    let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
           class Foo {
           public:
@@ -37,7 +37,7 @@ fn simple_non_virtual_function_is_ignored() {
 
 #[test]
 fn various_return_types_and_argument_types_can_be_mocked() {
-    let mocksmith = MockSmith::new_when_available().unwrap();
+    let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
           #include <string>
           #include <cstdint>
@@ -62,7 +62,7 @@ fn various_return_types_and_argument_types_can_be_mocked() {
 
 #[test]
 fn noexcept_and_const_qualifiers_are_added_when_needed() {
-    let mocksmith = MockSmith::new_when_available().unwrap();
+    let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
           #include <string>
           #include <cstdint>
@@ -89,7 +89,7 @@ fn noexcept_and_const_qualifiers_are_added_when_needed() {
 
 #[test]
 fn types_with_commas_are_wrapped_with_parenthesis() {
-    let mocksmith = MockSmith::new_when_available().unwrap();
+    let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
           #include <map>
           class Foo {
@@ -113,7 +113,7 @@ fn types_with_commas_are_wrapped_with_parenthesis() {
 
 #[test]
 fn protected_and_private_methods_are_mocked_as_public() {
-    let mocksmith = MockSmith::new_when_available().unwrap();
+    let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
           #include <map>
           class Foo {
@@ -141,7 +141,7 @@ fn protected_and_private_methods_are_mocked_as_public() {
 
 #[test]
 fn unknown_argument_type_is_mocked_as_int() {
-    let mocksmith = MockSmith::new_when_available().unwrap();
+    let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
           class Foo {
           public:
@@ -166,7 +166,7 @@ fn unknown_argument_type_is_mocked_as_int() {
 
 #[test]
 fn unknown_return_type_is_treated_as_non_virtual_function() {
-    let mocksmith = MockSmith::new_when_available().unwrap();
+    let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
           class Foo {
           public:
@@ -180,7 +180,7 @@ fn unknown_return_type_is_treated_as_non_virtual_function() {
 
 #[test]
 fn configured_indent_level_is_used() {
-    let mocksmith = MockSmith::new_when_available().unwrap().indent_level(4);
+    let mocksmith = Mocksmith::new_when_available().unwrap().indent_level(4);
     let cpp_class = "
           class Foo {
           public:
@@ -201,7 +201,7 @@ fn configured_indent_level_is_used() {
 
 #[test]
 fn configured_mock_name_function_is_used() {
-    let mocksmith = MockSmith::new_when_available()
+    let mocksmith = Mocksmith::new_when_available()
         .unwrap()
         .mock_name_fun(|class_name| format!("Smith{}", class_name));
     let cpp_class = "
@@ -232,7 +232,7 @@ fn mocks_can_be_generated_from_file() {
           virtual void bar() = 0;
         };",
     );
-    let mocksmith = MockSmith::new_when_available().unwrap();
+    let mocksmith = Mocksmith::new_when_available().unwrap();
     assert_mocks!(
         mocksmith.create_mocks_for_file(file.path()),
         lines!(
@@ -251,7 +251,7 @@ fn setting_include_path_finds_types_in_headers() {
     let header_name = temp_header.path().file_name().unwrap().to_str().unwrap();
 
     // Include path must be set to the directory of the header file.
-    let mocksmith = MockSmith::new_when_available()
+    let mocksmith = Mocksmith::new_when_available()
         .unwrap()
         .include_path(temp_header.path().parent().unwrap());
     assert_mocks!(
@@ -280,7 +280,7 @@ fn setting_include_path_finds_types_in_headers() {
 
 #[test]
 fn generate_all_functions_mocks_non_virtual_functions() {
-    let mocksmith = MockSmith::new_when_available()
+    let mocksmith = Mocksmith::new_when_available()
         .unwrap()
         .methods_to_mock(mocksmith::MethodsToMock::All);
 
@@ -327,7 +327,7 @@ fn generate_all_functions_mocks_non_virtual_functions() {
 
 #[test]
 fn generate_all_virtual_functions_mocks_virtual_functions_only() {
-    let mocksmith = MockSmith::new_when_available()
+    let mocksmith = Mocksmith::new_when_available()
         .unwrap()
         .methods_to_mock(mocksmith::MethodsToMock::AllVirtual);
 
@@ -364,7 +364,7 @@ fn generate_all_virtual_functions_mocks_virtual_functions_only() {
 
 #[test]
 fn generate_pure_virtual_functions_mocks_pure_virtual_functions_only() {
-    let mocksmith = MockSmith::new_when_available()
+    let mocksmith = Mocksmith::new_when_available()
         .unwrap()
         .methods_to_mock(mocksmith::MethodsToMock::OnlyPureVirtual);
 
