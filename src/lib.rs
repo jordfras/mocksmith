@@ -29,6 +29,8 @@ pub enum MocksmithError {
         line: u32,
         column: u32,
     },
+    #[error("No appropriate class to mock was found in the file")]
+    NothingToMock,
 }
 
 pub type Result<T> = std::result::Result<T, MocksmithError>;
@@ -135,19 +137,99 @@ impl Mocksmith {
         self
     }
 
-    /// Generates mocks for classes in the given file.
+    /// Generates mocks for classes in the given file. If no appropriate classes to mock
+    /// are found, an empty vector is returned.
     pub fn create_mocks_for_file(&self, file: &Path) -> Result<Vec<String>> {
         let index = clang::Index::new(&self.clang, true, false);
-        self.create_mocks(self.tu_from_file(&index, file), Some(file))
+        self.create_mocks(self.tu_from_file(&index, file)?)
     }
 
-    /// Generates mocks for classes in the given string.
+    /// Generates mocks for classes in the given string. If no appropriate classes to mock
+    /// are found, an empty vector is returned.
     pub fn create_mocks_from_string(&self, content: &str) -> Result<Vec<String>> {
         let index = clang::Index::new(&self.clang, true, false);
-        self.create_mocks(self.tu_from_string(&index, content), None)
+        self.create_mocks(self.tu_from_string(&index, content)?)
     }
 
-    fn create_mocks(&self, tu: clang::TranslationUnit, file: Option<&Path>) -> Result<Vec<String>> {
+    /// Generate the contents for a header file with mocks for classes in the give file.
+    /// If no appropriate classes to mock are found, an error is returned.
+    pub fn create_mock_header_for_file(&self, file: &Path) -> Result<String> {
+        let index = clang::Index::new(&self.clang, true, false);
+        let tu = self.tu_from_file(&index, file)?;
+        let classes = model::classes_in_translation_unit(&tu, self.methods_to_mock);
+        if classes.is_empty() {
+            return Err(MocksmithError::NothingToMock);
+        }
+        let mock_names = classes
+            .iter()
+            .map(|class| self.mock_name(class))
+            .collect::<Vec<_>>();
+
+        let mut builder = builder::CodeBuilder::new(self.indent_level);
+        generate::generate_header(
+            &mut builder,
+            &include_path_for(file, &self.include_paths),
+            &classes,
+            self.methods_to_mock,
+            &mock_names,
+        );
+        Ok(builder.build())
+    }
+
+    fn create_mocks(&self, tu: clang::TranslationUnit) -> Result<Vec<String>> {
+        let classes = model::classes_in_translation_unit(&tu, self.methods_to_mock);
+        Ok(classes
+            .iter()
+            .map(|class| {
+                let mut builder = builder::CodeBuilder::new(self.indent_level);
+                generate::generate_mock(
+                    &mut builder,
+                    class,
+                    self.methods_to_mock,
+                    &self.mock_name(class),
+                );
+                builder.build()
+            })
+            .collect())
+    }
+
+    fn mock_name(&self, class: &model::ClassToMock) -> String {
+        (self.name_mock)(class.class.get_name().expect("Class should have a name"))
+    }
+
+    fn tu_from_file<'a>(
+        &self,
+        index: &'a clang::Index<'_>,
+        file: &Path,
+    ) -> Result<clang::TranslationUnit<'a>> {
+        let tu = index
+            .parser(file)
+            .arguments(&self.clang_arguments())
+            .parse()
+            .expect("Failed to parse translation unit");
+        self.check_diagnostics(Some(file), &tu)?;
+        Ok(tu)
+    }
+
+    fn tu_from_string<'a>(
+        &self,
+        index: &'a clang::Index<'_>,
+        content: &str,
+    ) -> Result<clang::TranslationUnit<'a>> {
+        // Use `Unsaved` with dummy file name to be able to parse from a string
+        let unsaved = clang::Unsaved::new(Path::new("nofile.h"), content);
+        let tu = index
+            .parser("nofile.h")
+            .unsaved(&[unsaved])
+            .arguments(&self.clang_arguments())
+            .parse()
+            .expect("Failed to parse translation unit");
+        self.check_diagnostics(None, &tu)?;
+        Ok(tu)
+    }
+
+    fn check_diagnostics(&self, file: Option<&Path>, tu: &clang::TranslationUnit) -> Result<()> {
+        // Return error with the first diagnostic error found
         if let Some(diagnostic) = tu
             .get_diagnostics()
             .iter()
@@ -162,46 +244,7 @@ impl Mocksmith {
                 column: location.column,
             });
         }
-
-        let classes = model::classes_in_translation_unit(&tu, self.methods_to_mock);
-        Ok(classes
-            .iter()
-            .map(|class| {
-                generate::generate_mock(
-                    builder::CodeBuilder::new(self.indent_level),
-                    class,
-                    self.methods_to_mock,
-                    &(self.name_mock)(class.class.get_name().expect("Class should have a name")),
-                )
-            })
-            .collect())
-    }
-
-    fn tu_from_file<'a>(
-        &self,
-        index: &'a clang::Index<'_>,
-        file: &Path,
-    ) -> clang::TranslationUnit<'a> {
-        index
-            .parser(file)
-            .arguments(&self.clang_arguments())
-            .parse()
-            .expect("Failed to parse translation unit")
-    }
-
-    fn tu_from_string<'a>(
-        &self,
-        index: &'a clang::Index<'_>,
-        content: &str,
-    ) -> clang::TranslationUnit<'a> {
-        // Use `Unsaved` with dummy file name to be able to parse from a string
-        let unsaved = clang::Unsaved::new(Path::new("nofile.h"), content);
-        index
-            .parser("nofile.h")
-            .unsaved(&[unsaved])
-            .arguments(&self.clang_arguments())
-            .parse()
-            .expect("Failed to parse translation unit")
+        Ok(())
     }
 
     fn clang_arguments(&self) -> Vec<String> {
@@ -238,6 +281,34 @@ pub fn default_name_mock(class_name: String) -> String {
     } else {
         format!("Mock{}", class_name)
     }
+}
+
+// TODO:
+// - Test backslash
+// - Test non-existing paths
+// - Test no include paths -> should fallback to from .?
+// - Test no match
+fn include_path_for(header: &Path, include_paths: &[PathBuf]) -> String {
+    let canonic_header = header
+        .canonicalize()
+        .unwrap_or_else(|_| header.to_path_buf());
+
+    let mut best_match: PathBuf = canonic_header.clone();
+    for include_path in include_paths {
+        let include_path = include_path
+            .canonicalize()
+            .unwrap_or_else(|_| include_path.clone());
+        if let Ok(candidate) = canonic_header.strip_prefix(include_path) {
+            if candidate.components().count() < best_match.components().count() {
+                best_match = candidate.to_path_buf();
+            }
+        }
+    }
+
+    best_match
+        .to_str()
+        .expect("Path should be valid UTF-8")
+        .to_string()
 }
 
 #[cfg(test)]
@@ -281,5 +352,24 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(25));
         std::mem::drop(mocksmith);
         handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_include_path_for() {
+        let include_paths = vec![
+            PathBuf::from("/usr/include"),
+            PathBuf::from("/usr/local/include"),
+        ];
+        let header = PathBuf::from("/usr/include/header.h");
+        let result = include_path_for(&header, &include_paths);
+        assert_eq!(result, "header.h");
+
+        let header = PathBuf::from("/usr/local/include/another/header.h");
+        let result = include_path_for(&header, &include_paths);
+        assert_eq!(result, "another/header.h");
+
+        let header = PathBuf::from("/home/user/project/include/my_header.h");
+        let result = include_path_for(&header, &include_paths);
+        assert_eq!(result, "/home/user/project/include/my_header.h");
     }
 }
