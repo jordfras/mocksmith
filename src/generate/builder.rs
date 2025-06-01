@@ -1,14 +1,15 @@
+// Helper to build a string of code with indentation
 pub(crate) struct CodeBuilder {
     code: String,
-    indent_size: usize,
+    indent_str: String,
     indent_level: usize,
 }
 
 impl CodeBuilder {
-    pub(crate) fn new(indent_size: usize) -> Self {
+    pub(crate) fn new(indent_str: String) -> Self {
         CodeBuilder {
             code: String::new(),
-            indent_size,
+            indent_str,
             indent_level: 0,
         }
     }
@@ -23,8 +24,8 @@ impl CodeBuilder {
     }
 
     pub(crate) fn add_line(&mut self, line: &str) {
-        let indent = self.indent_level * self.indent_size;
-        self.code.push_str(&" ".repeat(indent));
+        let indent = self.indent_str.repeat(self.indent_level);
+        self.code.push_str(&indent);
         self.code.push_str(line);
         self.code.push('\n');
     }

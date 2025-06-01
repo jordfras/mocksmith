@@ -1,4 +1,3 @@
-mod builder;
 mod generate;
 mod model;
 
@@ -68,7 +67,6 @@ pub struct Mocksmith {
 
     include_paths: Vec<PathBuf>,
     methods_to_mock: MethodsToMock,
-    indent_level: usize,
     name_mock: fn(class_name: String) -> String,
 }
 
@@ -107,7 +105,6 @@ impl Mocksmith {
             include_paths: Vec::new(),
             methods_to_mock,
             name_mock: default_name_mock,
-            indent_level: 2,
         })
     }
 
@@ -126,9 +123,9 @@ impl Mocksmith {
         self
     }
 
-    /// Sets the indent level for the generated code. Default is 2 spaces.
-    pub fn indent_level(mut self, indent_level: usize) -> Self {
-        self.indent_level = indent_level;
+    /// Sets the string to use for indentation for the generated code. Default is 2 spaces.
+    pub fn indent_str(mut self, indent: String) -> Self {
+        self.generator.indent_str(indent);
         self
     }
 
@@ -166,26 +163,18 @@ impl Mocksmith {
             .map(|class| self.mock_name(class))
             .collect::<Vec<_>>();
 
-        let mut builder = builder::CodeBuilder::new(self.indent_level);
-        self.generator.header(
-            &mut builder,
+        Ok(self.generator.header(
             &include_path_for(file, &self.include_paths),
             &classes,
             &mock_names,
-        );
-        Ok(builder.build())
+        ))
     }
 
     fn create_mocks(&self, tu: clang::TranslationUnit) -> Result<Vec<String>> {
         let classes = model::classes_in_translation_unit(&tu, self.methods_to_mock);
         Ok(classes
             .iter()
-            .map(|class| {
-                let mut builder = builder::CodeBuilder::new(self.indent_level);
-                self.generator
-                    .mock(&mut builder, class, &self.mock_name(class));
-                builder.build()
-            })
+            .map(|class| self.generator.mock(class, &self.mock_name(class)))
             .collect())
     }
 

@@ -201,7 +201,9 @@ fn unknown_return_type_is_treated_as_error() {
 
 #[test]
 fn configured_indent_level_is_used() {
-    let mocksmith = Mocksmith::new_when_available().unwrap().indent_level(4);
+    let mocksmith = Mocksmith::new_when_available()
+        .unwrap()
+        .indent_str("    ".to_string());
     let cpp_class = "
           class Foo {
           public:
