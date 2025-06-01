@@ -64,6 +64,7 @@ static CLANG_MUTEX: Mutex<()> = Mutex::new(());
 pub struct Mocksmith {
     _clang_lock: MutexGuard<'static, ()>,
     clang: clang::Clang,
+    generator: generate::Generator,
 
     include_paths: Vec<PathBuf>,
     methods_to_mock: MethodsToMock,
@@ -81,14 +82,7 @@ impl Mocksmith {
             TryLockError::WouldBlock => MocksmithError::Busy,
             TryLockError::Poisoned(_) => MocksmithError::Poisoned,
         })?;
-        Ok(Self {
-            _clang_lock: clang_lock,
-            clang: clang::Clang::new().map_err(MocksmithError::ClangError)?,
-            include_paths: Vec::new(),
-            methods_to_mock: MethodsToMock::AllVirtual,
-            name_mock: default_name_mock,
-            indent_level: 2,
-        })
+        Self::create(clang_lock)
     }
 
     /// Creates a new Mocksmith instance.
@@ -101,11 +95,17 @@ impl Mocksmith {
             CLANG_MUTEX.clear_poison();
             return Self::new_when_available();
         };
+        Self::create(clang_lock)
+    }
+
+    fn create(clang_lock: MutexGuard<'static, ()>) -> Result<Self> {
+        let methods_to_mock = MethodsToMock::AllVirtual;
         Ok(Self {
             _clang_lock: clang_lock,
             clang: clang::Clang::new().map_err(MocksmithError::ClangError)?,
+            generator: generate::Generator::new(methods_to_mock),
             include_paths: Vec::new(),
-            methods_to_mock: MethodsToMock::AllVirtual,
+            methods_to_mock,
             name_mock: default_name_mock,
             indent_level: 2,
         })
@@ -122,6 +122,7 @@ impl Mocksmith {
     /// all virtual methods.
     pub fn methods_to_mock(mut self, functions: MethodsToMock) -> Self {
         self.methods_to_mock = functions;
+        self.generator.methods_to_mock(functions);
         self
     }
 
@@ -166,11 +167,10 @@ impl Mocksmith {
             .collect::<Vec<_>>();
 
         let mut builder = builder::CodeBuilder::new(self.indent_level);
-        generate::generate_header(
+        self.generator.header(
             &mut builder,
             &include_path_for(file, &self.include_paths),
             &classes,
-            self.methods_to_mock,
             &mock_names,
         );
         Ok(builder.build())
@@ -182,12 +182,8 @@ impl Mocksmith {
             .iter()
             .map(|class| {
                 let mut builder = builder::CodeBuilder::new(self.indent_level);
-                generate::generate_mock(
-                    &mut builder,
-                    class,
-                    self.methods_to_mock,
-                    &self.mock_name(class),
-                );
+                self.generator
+                    .mock(&mut builder, class, &self.mock_name(class));
                 builder.build()
             })
             .collect())
