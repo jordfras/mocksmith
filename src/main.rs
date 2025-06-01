@@ -26,16 +26,15 @@ fn main() {
             });
     } else {
         for arg in std::env::args().skip(1) {
-            mocksmith
-                .create_mocks_for_file(std::path::Path::new(&arg))
-                .unwrap_or_else(|error| {
-                    eprintln!("Error creating mocks from file:\n{error}");
-                    std::process::exit(1);
-                })
-                .into_iter()
-                .for_each(|mock| {
-                    println!("{}", mock);
-                });
+            println!(
+                "{}",
+                mocksmith
+                    .create_mock_header_for_file(std::path::Path::new(&arg))
+                    .unwrap_or_else(|error| {
+                        eprintln!("Error creating mocks from file:\n{error}");
+                        std::process::exit(1);
+                    })
+            );
         }
     }
 }
