@@ -223,6 +223,47 @@ fn configured_indent_level_is_used() {
 }
 
 #[test]
+fn configured_nested_namespace_style_is_used() {
+    let mut mocksmith = Mocksmith::new_when_available()
+        .unwrap()
+        .indent_str("    ".to_string());
+    let cpp_class = "
+          namespace outer { namespace inner {
+          class Foo {
+          public:
+            virtual ~Foo() = default;
+            virtual void bar() = 0;
+          };
+          }}";
+    assert_mocks!(
+        mocksmith.create_mocks_from_string(cpp_class),
+        lines!(
+            "namespace outer::inner {"
+            "class MockFoo : public Foo"
+            "{"
+            "public:"
+            "    MOCK_METHOD(void, bar, (), (override));"
+            "};"
+            "}"
+        )
+    );
+
+    mocksmith = mocksmith.simplified_nested_namespaces(false);
+    assert_mocks!(
+        mocksmith.create_mocks_from_string(cpp_class),
+        lines!(
+            "namespace outer { namespace inner {"
+            "class MockFoo : public Foo"
+            "{"
+            "public:"
+            "    MOCK_METHOD(void, bar, (), (override));"
+            "};"
+            "}}"
+        )
+    );
+}
+
+#[test]
 fn configured_mock_name_function_is_used() {
     let mocksmith = Mocksmith::new_when_available()
         .unwrap()

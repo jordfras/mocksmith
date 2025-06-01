@@ -7,6 +7,7 @@ use crate::model;
 // for a set of classes.
 pub(crate) struct Generator {
     methods_to_mock: MethodsToMock,
+    simplified_nested_namespaces: bool,
     indent_str: String,
 }
 
@@ -14,12 +15,17 @@ impl Generator {
     pub(crate) fn new(methods_to_mock: MethodsToMock) -> Self {
         Self {
             methods_to_mock,
+            simplified_nested_namespaces: true,
             indent_str: "  ".to_string(),
         }
     }
 
     pub(crate) fn methods_to_mock(&mut self, functions: MethodsToMock) {
         self.methods_to_mock = functions;
+    }
+
+    pub(crate) fn simplified_nested_namespaces(&mut self, value: bool) {
+        self.simplified_nested_namespaces = value;
     }
 
     pub(crate) fn indent_str(&mut self, indent_str: String) {
@@ -62,7 +68,9 @@ impl Generator {
         class: &model::ClassToMock,
         mock_name: &str,
     ) {
-        if let Some(namespace_start) = namespace_start(&class.namespaces) {
+        if let Some(namespace_start) =
+            namespace_start(self.simplified_nested_namespaces, &class.namespaces)
+        {
             builder.add_line(namespace_start.as_str());
         }
 
@@ -90,15 +98,26 @@ impl Generator {
         builder.pop_indent();
         builder.add_line("};");
 
-        if let Some(namespace_end) = namespace_end(&class.namespaces) {
+        if let Some(namespace_end) =
+            namespace_end(self.simplified_nested_namespaces, &class.namespaces)
+        {
             builder.add_line(namespace_end.as_str());
         }
     }
 }
 
-fn namespace_start(namespaces: &[clang::Entity]) -> Option<String> {
+fn namespace_start(simplified: bool, namespaces: &[clang::Entity]) -> Option<String> {
     if namespaces.is_empty() {
         None
+    } else if simplified {
+        Some(format!(
+            "namespace {} {{",
+            namespaces
+                .iter()
+                .map(|namespace| namespace.get_name().expect("Namespace should have a name"))
+                .collect::<Vec<_>>()
+                .join("::")
+        ))
     } else {
         Some(
             namespaces
@@ -115,9 +134,11 @@ fn namespace_start(namespaces: &[clang::Entity]) -> Option<String> {
     }
 }
 
-fn namespace_end(namespaces: &[clang::Entity]) -> Option<String> {
+fn namespace_end(simplified: bool, namespaces: &[clang::Entity]) -> Option<String> {
     if namespaces.is_empty() {
         None
+    } else if simplified {
+        Some("}".to_string())
     } else {
         Some("}".repeat(namespaces.len()))
     }

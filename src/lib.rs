@@ -123,6 +123,13 @@ impl Mocksmith {
         self
     }
 
+    /// Controls whether to use C++17 style nested namespace declarations with colon
+    /// separation or older style. Default is true.
+    pub fn simplified_nested_namespaces(mut self, value: bool) -> Self {
+        self.generator.simplified_nested_namespaces(value);
+        self
+    }
+
     /// Sets the string to use for indentation for the generated code. Default is 2 spaces.
     pub fn indent_str(mut self, indent: String) -> Self {
         self.generator.indent_str(indent);
