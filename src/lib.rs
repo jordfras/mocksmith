@@ -172,11 +172,14 @@ impl Mocksmith {
             .map(|class| self.mock_name(class))
             .collect::<Vec<_>>();
 
-        Ok(self.generator.header(
-            &header_path(file, &self.include_paths),
-            &classes,
-            &mock_names,
-        ))
+        let header_path = if self.include_paths.is_empty() {
+            header_path(file, &self.include_paths)
+        } else {
+            header_path(file, &[PathBuf::from(".")])
+        };
+        Ok(self
+            .generator
+            .header(header_path.as_str(), &classes, &mock_names))
     }
 
     fn create_mocks(&self, tu: clang::TranslationUnit) -> Result<Vec<String>> {
