@@ -1,6 +1,8 @@
 mod generate;
+mod headerpath;
 mod model;
 
+use headerpath::header_path;
 use std::{
     path::{Path, PathBuf},
     sync::{Mutex, MutexGuard, TryLockError},
@@ -171,7 +173,7 @@ impl Mocksmith {
             .collect::<Vec<_>>();
 
         Ok(self.generator.header(
-            &include_path_for(file, &self.include_paths),
+            &header_path(file, &self.include_paths),
             &classes,
             &mock_names,
         ))
@@ -275,34 +277,6 @@ pub fn default_name_mock(class_name: String) -> String {
     }
 }
 
-// TODO:
-// - Test backslash
-// - Test non-existing paths
-// - Test no include paths -> should fallback to from .?
-// - Test no match
-fn include_path_for(header: &Path, include_paths: &[PathBuf]) -> String {
-    let canonic_header = header
-        .canonicalize()
-        .unwrap_or_else(|_| header.to_path_buf());
-
-    let mut best_match: PathBuf = canonic_header.clone();
-    for include_path in include_paths {
-        let include_path = include_path
-            .canonicalize()
-            .unwrap_or_else(|_| include_path.clone());
-        if let Ok(candidate) = canonic_header.strip_prefix(include_path) {
-            if candidate.components().count() < best_match.components().count() {
-                best_match = candidate.to_path_buf();
-            }
-        }
-    }
-
-    best_match
-        .to_str()
-        .expect("Path should be valid UTF-8")
-        .to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -344,24 +318,5 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(25));
         std::mem::drop(mocksmith);
         handle.join().unwrap();
-    }
-
-    #[test]
-    fn test_include_path_for() {
-        let include_paths = vec![
-            PathBuf::from("/usr/include"),
-            PathBuf::from("/usr/local/include"),
-        ];
-        let header = PathBuf::from("/usr/include/header.h");
-        let result = include_path_for(&header, &include_paths);
-        assert_eq!(result, "header.h");
-
-        let header = PathBuf::from("/usr/local/include/another/header.h");
-        let result = include_path_for(&header, &include_paths);
-        assert_eq!(result, "another/header.h");
-
-        let header = PathBuf::from("/home/user/project/include/my_header.h");
-        let result = include_path_for(&header, &include_paths);
-        assert_eq!(result, "/home/user/project/include/my_header.h");
     }
 }
