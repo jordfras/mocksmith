@@ -346,7 +346,7 @@ fn setting_include_path_finds_types_in_headers() {
 fn generate_all_functions_mocks_non_virtual_functions() {
     let mocksmith = Mocksmith::new_when_available()
         .unwrap()
-        .methods_to_mock(mocksmith::MethodsToMock::All);
+        .methods_to_mock(mocksmith::MethodsToMockStrategy::All);
 
     // Class with only non-virtual functions can be found and mocked
     let cpp_class = "
@@ -393,7 +393,7 @@ fn generate_all_functions_mocks_non_virtual_functions() {
 fn generate_all_virtual_functions_mocks_virtual_functions_only() {
     let mocksmith = Mocksmith::new_when_available()
         .unwrap()
-        .methods_to_mock(mocksmith::MethodsToMock::AllVirtual);
+        .methods_to_mock(mocksmith::MethodsToMockStrategy::AllVirtual);
 
     // Class with only non-virtual functions is ignored
     let cpp_class = "
@@ -430,7 +430,7 @@ fn generate_all_virtual_functions_mocks_virtual_functions_only() {
 fn generate_pure_virtual_functions_mocks_pure_virtual_functions_only() {
     let mocksmith = Mocksmith::new_when_available()
         .unwrap()
-        .methods_to_mock(mocksmith::MethodsToMock::OnlyPureVirtual);
+        .methods_to_mock(mocksmith::MethodsToMockStrategy::OnlyPureVirtual);
 
     // Class with non pure virtual functions is ignored
     let cpp_class = "

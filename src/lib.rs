@@ -38,21 +38,21 @@ pub type Result<T> = std::result::Result<T, MocksmithError>;
 
 /// Enum to control which methods to mock in a class.
 #[derive(Clone, Copy)]
-pub enum MethodsToMock {
-    /// Mock all functions, including non-virtual ones.
+pub enum MethodsToMockStrategy {
+    /// Mock all methods, including non-virtual ones.
     All,
-    /// Mock only virtual functions, including pure virtual ones.
+    /// Mock only virtual methods, including pure virtual ones.
     AllVirtual,
-    /// Mock only pure virtual functions.
+    /// Mock only pure virtual methods.
     OnlyPureVirtual,
 }
 
-impl MethodsToMock {
+impl MethodsToMockStrategy {
     fn should_mock(self, method: &clang::Entity) -> bool {
         match self {
-            MethodsToMock::All => !method.is_static_method(),
-            MethodsToMock::AllVirtual => method.is_virtual_method(),
-            MethodsToMock::OnlyPureVirtual => method.is_pure_virtual_method(),
+            MethodsToMockStrategy::All => !method.is_static_method(),
+            MethodsToMockStrategy::AllVirtual => method.is_virtual_method(),
+            MethodsToMockStrategy::OnlyPureVirtual => method.is_pure_virtual_method(),
         }
     }
 }
@@ -68,7 +68,7 @@ pub struct Mocksmith {
     generator: generate::Generator,
 
     include_paths: Vec<PathBuf>,
-    methods_to_mock: MethodsToMock,
+    methods_to_mock: MethodsToMockStrategy,
     name_mock: fn(class_name: String) -> String,
 }
 
@@ -99,7 +99,7 @@ impl Mocksmith {
     }
 
     fn create(clang_lock: MutexGuard<'static, ()>) -> Result<Self> {
-        let methods_to_mock = MethodsToMock::AllVirtual;
+        let methods_to_mock = MethodsToMockStrategy::AllVirtual;
         Ok(Self {
             _clang_lock: clang_lock,
             clang: clang::Clang::new().map_err(MocksmithError::ClangError)?,
@@ -119,7 +119,7 @@ impl Mocksmith {
 
     /// Sets which methods to mock in the classes. Default is `AllVirtual`, which mocks
     /// all virtual methods.
-    pub fn methods_to_mock(mut self, functions: MethodsToMock) -> Self {
+    pub fn methods_to_mock(mut self, functions: MethodsToMockStrategy) -> Self {
         self.methods_to_mock = functions;
         self.generator.methods_to_mock(functions);
         self

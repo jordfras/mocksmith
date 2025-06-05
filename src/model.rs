@@ -19,14 +19,14 @@ impl<'a> ClassToMock<'a> {
 // Finds classes to mock in the main file of a translation unit
 pub(crate) fn classes_in_translation_unit<'a>(
     root: &'a clang::TranslationUnit<'a>,
-    methods_to_mock: crate::MethodsToMock,
+    methods_to_mock: crate::MethodsToMockStrategy,
 ) -> Vec<ClassToMock<'a>> {
     AstTraverser::new(root, methods_to_mock).traverse()
 }
 
 struct AstTraverser<'a> {
     root: clang::Entity<'a>,
-    methods_to_mock: crate::MethodsToMock,
+    methods_to_mock: crate::MethodsToMockStrategy,
 
     classes: Vec<ClassToMock<'a>>,
     namespace_stack: Vec<clang::Entity<'a>>,
@@ -35,7 +35,7 @@ struct AstTraverser<'a> {
 impl<'a> AstTraverser<'a> {
     pub fn new(
         root: &'a clang::TranslationUnit<'a>,
-        methods_to_mock: crate::MethodsToMock,
+        methods_to_mock: crate::MethodsToMockStrategy,
     ) -> Self {
         Self {
             root: root.get_entity(),

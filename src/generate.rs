@@ -1,18 +1,18 @@
 mod builder;
 
-use crate::MethodsToMock;
+use crate::MethodsToMockStrategy;
 use crate::model;
 
 // Generator for gmock mocks. Generates mock code for a single class or complete headers
 // for a set of classes.
 pub(crate) struct Generator {
-    methods_to_mock: MethodsToMock,
+    methods_to_mock: MethodsToMockStrategy,
     simplified_nested_namespaces: bool,
     indent_str: String,
 }
 
 impl Generator {
-    pub(crate) fn new(methods_to_mock: MethodsToMock) -> Self {
+    pub(crate) fn new(methods_to_mock: MethodsToMockStrategy) -> Self {
         Self {
             methods_to_mock,
             simplified_nested_namespaces: true,
@@ -20,7 +20,7 @@ impl Generator {
         }
     }
 
-    pub(crate) fn methods_to_mock(&mut self, functions: MethodsToMock) {
+    pub(crate) fn methods_to_mock(&mut self, functions: MethodsToMockStrategy) {
         self.methods_to_mock = functions;
     }
 
