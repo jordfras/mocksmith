@@ -68,11 +68,7 @@ impl Generator {
         class: &model::ClassToMock,
         mock_name: &str,
     ) {
-        if let Some(namespace_start) =
-            namespace_start(self.simplified_nested_namespaces, &class.namespaces)
-        {
-            builder.add_line(namespace_start.as_str());
-        }
+        builder.maybe_add_line(&self.namespace_start(&class.namespaces));
 
         builder.add_line(&format!(
             "class {} : public {}",
@@ -98,49 +94,45 @@ impl Generator {
         builder.pop_indent();
         builder.add_line("};");
 
-        if let Some(namespace_end) =
-            namespace_end(self.simplified_nested_namespaces, &class.namespaces)
-        {
-            builder.add_line(namespace_end.as_str());
+        builder.maybe_add_line(&self.namespace_end(&class.namespaces));
+    }
+
+    fn namespace_start(&self, namespaces: &[clang::Entity]) -> Option<String> {
+        if namespaces.is_empty() {
+            None
+        } else if self.simplified_nested_namespaces {
+            Some(format!(
+                "namespace {} {{",
+                namespaces
+                    .iter()
+                    .map(|namespace| namespace.get_name().expect("Namespace should have a name"))
+                    .collect::<Vec<_>>()
+                    .join("::")
+            ))
+        } else {
+            Some(
+                namespaces
+                    .iter()
+                    .map(|namespace| {
+                        format!(
+                            "namespace {} {{",
+                            namespace.get_name().expect("Namespace should have a name")
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            )
         }
     }
-}
 
-fn namespace_start(simplified: bool, namespaces: &[clang::Entity]) -> Option<String> {
-    if namespaces.is_empty() {
-        None
-    } else if simplified {
-        Some(format!(
-            "namespace {} {{",
-            namespaces
-                .iter()
-                .map(|namespace| namespace.get_name().expect("Namespace should have a name"))
-                .collect::<Vec<_>>()
-                .join("::")
-        ))
-    } else {
-        Some(
-            namespaces
-                .iter()
-                .map(|namespace| {
-                    format!(
-                        "namespace {} {{",
-                        namespace.get_name().expect("Namespace should have a name")
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(" "),
-        )
-    }
-}
-
-fn namespace_end(simplified: bool, namespaces: &[clang::Entity]) -> Option<String> {
-    if namespaces.is_empty() {
-        None
-    } else if simplified {
-        Some("}".to_string())
-    } else {
-        Some("}".repeat(namespaces.len()))
+    fn namespace_end(&self, namespaces: &[clang::Entity]) -> Option<String> {
+        if namespaces.is_empty() {
+            None
+        } else if self.simplified_nested_namespaces {
+            Some("}".to_string())
+        } else {
+            Some("}".repeat(namespaces.len()))
+        }
     }
 }
 

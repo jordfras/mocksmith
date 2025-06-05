@@ -30,6 +30,12 @@ impl CodeBuilder {
         self.code.push('\n');
     }
 
+    pub(crate) fn maybe_add_line(&mut self, line: &Option<String>) {
+        if let Some(line) = line {
+            self.add_line(line);
+        }
+    }
+
     pub(crate) fn _newline(&mut self) {
         self.code.push('\n');
     }
