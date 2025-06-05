@@ -1,0 +1,25 @@
+[package]
+name = "mocksmith"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version="4.5", features=["derive"] }
+dunce = "1.0"
+pathdiff = "0.2"
+thiserror = "2.0"
+
+# Use runtime feature to load libclang at runtime. This makes it possible to build without
+# instructing clang-sys where libclang is located. For some reason, clang-sys does a
+# better job at finding libclang this way.
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+clang = { version="2.0", features=["runtime", "clang_5_0"] }
+
+# There is an issue with clang 19 and 20 on Windows when using the runtime feature.
+# Unloading of DLL causes segfault when the clang::Clang object is droppped.
+[target.'cfg(target_os = "windows")'.dependencies]
+clang = { version="2.0", features=["clang_5_0"] }
+
+
+[dev-dependencies]
+tempfile = { version="3.20", default-features=false }
