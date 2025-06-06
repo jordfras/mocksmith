@@ -1,12 +1,31 @@
-use std::io::Read;
+use clap::Parser;
+use std::{io::Read, path::PathBuf};
 
 use mocksmith::Mocksmith;
 
-fn main() {
-    let mocksmith = Mocksmith::new()
-        .unwrap_or_else(|message| panic!("Could not create Mocksmith instance: {message}"));
+/// Generates mocks for the Google Mock framework (gmock) from C++ header files. If no
+/// header files are provided, stdin is read and mocks are generated for the content.
+#[derive(Parser, Debug)]
+#[command(version, about)]
+struct Arguments {
+    /// Directory to add to include search path. This needs to be set up properly to
+    /// find types used in source header files. Also used to determine the relative path
+    /// to use when including the source header file from generated mock header file.
+    #[arg(short = 'I', long)]
+    include_dir: Vec<PathBuf>,
 
-    if std::env::args().len() == 1 {
+    /// Paths to the header files to mock.
+    header: Vec<PathBuf>,
+}
+
+fn main() {
+    let arguments = Arguments::parse();
+
+    let mocksmith = Mocksmith::new()
+        .unwrap_or_else(|message| panic!("Could not create Mocksmith instance: {message}"))
+        .include_paths(&arguments.include_dir);
+
+    if arguments.header.is_empty() {
         let mut content = String::new();
         std::io::stdin()
             .read_to_string(&mut content)
@@ -25,11 +44,11 @@ fn main() {
                 println!("{}", mock);
             });
     } else {
-        for arg in std::env::args().skip(1) {
-            println!(
+        for header in arguments.header {
+            print!(
                 "{}",
                 mocksmith
-                    .create_mock_header_for_file(std::path::Path::new(&arg))
+                    .create_mock_header_for_file(&header)
                     .unwrap_or_else(|error| {
                         eprintln!("Error creating mocks from file:\n{error}");
                         std::process::exit(1);

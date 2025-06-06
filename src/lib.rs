@@ -117,6 +117,13 @@ impl Mocksmith {
         self
     }
 
+    /// Adds include paths to the list of paths to search for headers. If no include
+    /// paths are set, the current directory is used.
+    pub fn include_paths(mut self, include_paths: &[PathBuf]) -> Self {
+        self.include_paths.extend(include_paths.iter().cloned());
+        self
+    }
+
     /// Sets which methods to mock in the classes. Default is `AllVirtual`, which mocks
     /// all virtual methods.
     pub fn methods_to_mock(mut self, functions: MethodsToMockStrategy) -> Self {
