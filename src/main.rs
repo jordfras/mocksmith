@@ -1,3 +1,4 @@
+use anyhow::Context;
 use clap::Parser;
 use std::{io::Read, path::PathBuf};
 
@@ -18,27 +19,21 @@ struct Arguments {
     header: Vec<PathBuf>,
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let arguments = Arguments::parse();
 
     let mocksmith = Mocksmith::new()
-        .unwrap_or_else(|message| panic!("Could not create Mocksmith instance: {message}"))
+        .context("Could not create Mocksmith instance")?
         .include_paths(&arguments.include_dir);
 
     if arguments.header.is_empty() {
         let mut content = String::new();
         std::io::stdin()
             .read_to_string(&mut content)
-            .unwrap_or_else(|_| {
-                eprintln!("Failed to read from stdin");
-                std::process::exit(1);
-            });
+            .context("Failed to read from stdin")?;
         mocksmith
             .create_mocks_from_string(&content)
-            .unwrap_or_else(|error| {
-                eprintln!("Error creating mocks from string:\n{error}");
-                std::process::exit(1);
-            })
+            .context("Could not create mocks")?
             .into_iter()
             .for_each(|mock| {
                 println!("{}", mock);
@@ -49,11 +44,13 @@ fn main() {
                 "{}",
                 mocksmith
                     .create_mock_header_for_file(&header)
-                    .unwrap_or_else(|error| {
-                        eprintln!("Error creating mocks from file:\n{error}");
-                        std::process::exit(1);
-                    })
+                    .with_context(|| format!(
+                        "Could not create mocks from file {}",
+                        header.display()
+                    ))?
             );
         }
     }
+
+    Ok(())
 }

@@ -6,6 +6,7 @@ license = "MIT"
 authors = ["Thomas Johannesson"]
 
 [dependencies]
+anyhow = "1.0"
 clap = { version="4.5", features=["derive"] }
 dunce = "1.0"
 pathdiff = "0.2"
