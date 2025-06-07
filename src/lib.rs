@@ -60,6 +60,32 @@ impl MethodsToMockStrategy {
     }
 }
 
+/// Representation of a mock produced by Mocksmith.
+#[derive(Debug, PartialEq)]
+pub struct Mock {
+    /// Path to the header file of the mocked class
+    pub parent_header: Option<PathBuf>,
+    /// Name of the mocked class
+    pub parent_name: String,
+    /// Name of the mock
+    pub name: String,
+    /// Code for the mock
+    pub code: String,
+}
+
+/// Representation of a mock header produced by Mocksmith.
+#[derive(Debug, PartialEq)]
+pub struct MockHeader {
+    /// Path to the header file of the mocked class
+    pub parent_header: Option<PathBuf>,
+    /// Name of the mocked classes
+    pub parent_names: Vec<String>,
+    /// Name of the mocks, same order as `parent_name`
+    pub names: Vec<String>,
+    /// Code for the mock header
+    pub code: String,
+}
+
 // Ensure Clang is initialized in only one thread at a time. The clang::Clang struct
 // cannot be put in a LazyLock<Mutex<>> itself.
 static CLANG_MUTEX: Mutex<()> = Mutex::new(());
@@ -156,21 +182,25 @@ impl Mocksmith {
 
     /// Generates mocks for classes in the given file. If no appropriate classes to mock
     /// are found, an empty vector is returned.
-    pub fn create_mocks_for_file(&self, file: &Path) -> Result<Vec<String>> {
+    pub fn create_mocks_for_file(&self, file: &Path) -> Result<Vec<Mock>> {
         let index = clang::Index::new(&self.clang, true, false);
-        self.create_mocks(self.tu_from_file(&index, file)?)
+        let mut mocks = self.create_mocks(self.tu_from_file(&index, file)?)?;
+        mocks.iter_mut().for_each(|m| {
+            m.parent_header = Some(file.to_path_buf());
+        });
+        Ok(mocks)
     }
 
     /// Generates mocks for classes in the given string. If no appropriate classes to mock
     /// are found, an empty vector is returned.
-    pub fn create_mocks_from_string(&self, content: &str) -> Result<Vec<String>> {
+    pub fn create_mocks_from_string(&self, content: &str) -> Result<Vec<Mock>> {
         let index = clang::Index::new(&self.clang, true, false);
         self.create_mocks(self.tu_from_string(&index, content)?)
     }
 
     /// Generate the contents for a header file with mocks for classes in the give file.
     /// If no appropriate classes to mock are found, an error is returned.
-    pub fn create_mock_header_for_file(&self, file: &Path) -> Result<String> {
+    pub fn create_mock_header_for_file(&self, file: &Path) -> Result<MockHeader> {
         let index = clang::Index::new(&self.clang, true, false);
         let tu = self.tu_from_file(&index, file)?;
         let classes = model::classes_in_translation_unit(&tu, self.methods_to_mock);
@@ -187,12 +217,14 @@ impl Mocksmith {
         } else {
             header_path(file, &[PathBuf::from(".")])
         };
-        Ok(self
+        let mut header = self
             .generator
-            .header(header_path.as_str(), &classes, &mock_names))
+            .header(header_path.as_str(), &classes, &mock_names);
+        header.parent_header = Some(file.to_path_buf());
+        Ok(header)
     }
 
-    fn create_mocks(&self, tu: clang::TranslationUnit) -> Result<Vec<String>> {
+    fn create_mocks(&self, tu: clang::TranslationUnit) -> Result<Vec<Mock>> {
         let classes = model::classes_in_translation_unit(&tu, self.methods_to_mock);
         Ok(classes
             .iter()

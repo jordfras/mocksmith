@@ -14,6 +14,10 @@ impl<'a> ClassToMock<'a> {
             .copied()
             .collect()
     }
+
+    pub(crate) fn name(&self) -> String {
+        self.class.get_name().expect("Class should have a name")
+    }
 }
 
 // Finds classes to mock in the main file of a translation unit

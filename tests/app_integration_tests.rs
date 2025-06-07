@@ -24,6 +24,7 @@ fn input_from_stdin_can_be_mocked() {
         "  MOCK_METHOD(void, fun, (), (override));"
         "};\n"
     )));
+
     assert!(mocksmith.wait().success());
 }
 
