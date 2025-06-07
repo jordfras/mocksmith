@@ -44,7 +44,7 @@ fn main() -> anyhow::Result<()> {
             .context("Could not create mocks")?
             .into_iter()
             .for_each(|mock| {
-                println!("{}", mock);
+                print!("{}", mock.code);
             });
     } else {
         for header in arguments.header {
@@ -56,6 +56,7 @@ fn main() -> anyhow::Result<()> {
                         "Could not create mocks from file {}",
                         header.display()
                     ))?
+                    .code
             );
         }
     }
