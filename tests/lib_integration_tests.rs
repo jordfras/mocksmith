@@ -1,3 +1,4 @@
+mod assertions;
 mod helpers;
 
 use helpers::temp_file;

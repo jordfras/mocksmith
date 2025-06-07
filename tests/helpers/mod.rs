@@ -10,22 +10,6 @@ macro_rules! lines {
     };
 }
 
-#[macro_export]
-macro_rules! assert_mocks {
-    ($actual_mocks:expr $(, $expected_mock:expr)*) => {
-        let expected_mocks = vec![$(($expected_mock)),*];
-        assert_eq!($actual_mocks.unwrap(), expected_mocks);
-    };
-}
-
-#[macro_export]
-macro_rules! assert_no_mocks {
-    ($actual_mocks:expr) => {
-        let expected_mocks: Vec<String> = vec![];
-        assert_eq!($actual_mocks.unwrap(), expected_mocks);
-    };
-}
-
 pub fn temp_file(content: &str) -> tempfile::NamedTempFile {
     let mut file = tempfile::NamedTempFile::new().expect("Should be able to create temp file");
     writeln!(file, "{content}").expect("Should be able to write to file");
