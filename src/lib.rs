@@ -1,6 +1,7 @@
 mod generate;
 mod headerpath;
 mod model;
+pub mod naming;
 
 use headerpath::header_path;
 use std::{
@@ -16,6 +17,8 @@ pub enum MocksmithError {
     Poisoned,
     #[error("Could not access Clang: {0}")]
     ClangError(String),
+    #[error("Invalid sed style replacement string: {0}")]
+    InvalidSedReplacement(String),
     #[error("Parse error {}at line {}, column {}: {}",
             if file.is_none() {
                 String::new()
@@ -69,7 +72,7 @@ pub struct Mocksmith {
 
     include_paths: Vec<PathBuf>,
     methods_to_mock: MethodsToMockStrategy,
-    name_mock: fn(class_name: String) -> String,
+    name_mock: Box<dyn Fn(&str) -> String>,
 }
 
 impl Mocksmith {
@@ -106,7 +109,7 @@ impl Mocksmith {
             generator: generate::Generator::new(methods_to_mock),
             include_paths: Vec::new(),
             methods_to_mock,
-            name_mock: default_name_mock,
+            name_mock: Box::new(naming::default_name_mock),
         })
     }
 
@@ -146,8 +149,8 @@ impl Mocksmith {
     }
 
     /// Sets a custom function to generate mock names based on class names.
-    pub fn mock_name_fun(mut self, name_mock: fn(class_name: String) -> String) -> Self {
-        self.name_mock = name_mock;
+    pub fn mock_name_fun(mut self, name_mock: impl Fn(&str) -> String + 'static) -> Self {
+        self.name_mock = Box::new(name_mock);
         self
     }
 
@@ -198,7 +201,7 @@ impl Mocksmith {
     }
 
     fn mock_name(&self, class: &model::ClassToMock) -> String {
-        (self.name_mock)(class.class.get_name().expect("Class should have a name"))
+        (self.name_mock)(&class.class.get_name().expect("Class should have a name"))
     }
 
     fn tu_from_file<'a>(
@@ -264,54 +267,9 @@ impl Mocksmith {
     }
 }
 
-/// Default function to generate mock names.
-///
-/// This function generates a mock name by stripping common prefixes or suffixes like
-/// "Interface", "Ifc", or "I" from the class name and prepending "Mock" to it.
-pub fn default_name_mock(class_name: String) -> String {
-    if class_name.ends_with("Interface") {
-        format!("Mock{}", class_name.strip_suffix("Interface").unwrap())
-    } else if class_name.ends_with("Ifc") {
-        format!("Mock{}", class_name.strip_suffix("Ifc").unwrap())
-    } else if class_name.starts_with("Interface") {
-        format!("Mock{}", class_name.strip_prefix("Interface").unwrap())
-    } else if class_name.starts_with("Ifc") {
-        format!("Mock{}", class_name.strip_prefix("Ifc").unwrap())
-    } else if class_name.starts_with("I")
-        && class_name.len() > 1
-        && class_name.chars().nth(1).unwrap().is_uppercase()
-    {
-        format!("Mock{}", class_name.strip_prefix("I").unwrap())
-    } else {
-        format!("Mock{}", class_name)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_default_name_mock() {
-        assert_eq!(
-            default_name_mock("MyTypeInterface".to_string()),
-            "MockMyType"
-        );
-        assert_eq!(default_name_mock("MyTypeIfc".to_string()), "MockMyType");
-        assert_eq!(
-            default_name_mock("InterfaceMyType".to_string()),
-            "MockMyType"
-        );
-        assert_eq!(default_name_mock("IfcMyType".to_string()), "MockMyType");
-        assert_eq!(default_name_mock("IMyType".to_string()), "MockMyType");
-
-        assert_eq!(default_name_mock("MyType".to_string()), "MockMyType");
-        assert_eq!(
-            default_name_mock("InterestingType".to_string()),
-            "MockInterestingType"
-        );
-        assert_eq!(default_name_mock("I".to_string()), "MockI");
-    }
 
     #[test]
     fn test_new_with_threads() {
