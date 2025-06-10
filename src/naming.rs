@@ -1,3 +1,5 @@
+use crate::MockHeader;
+
 /// Default function to generate mock names.
 ///
 /// This function generates a mock name by stripping common prefixes or suffixes like
@@ -19,6 +21,24 @@ pub fn default_name_mock(class_name: &str) -> String {
     } else {
         format!("Mock{}", class_name)
     }
+}
+
+/// Default function to generate output file names for mocks.
+pub fn default_name_output_file(header: &MockHeader) -> String {
+    if let Some(parent_header) = &header.parent_header {
+        if let Some(stem) = parent_header.file_stem() {
+            let mut file_name = stem.to_os_string();
+            file_name.push("_mocks");
+            file_name.push(".");
+            if let Some(extension) = parent_header.extension() {
+                file_name.push(extension);
+            } else {
+                file_name.push("h");
+            }
+            return file_name.to_string_lossy().to_string();
+        }
+    }
+    String::from("mocks.h")
 }
 
 /// Helper struct to name mocks based on sed style regex replacement.
@@ -57,16 +77,16 @@ impl SedReplacement {
     /// Generates a mock name based on the provided class name using the regex and name
     /// pattern. If the regex does not match, it defaults to prefixing "Mock" to the
     /// class name.
-    pub fn mock_name(&self, class_name: &str) -> String {
+    pub fn name(&self, class_name: &str) -> String {
         let Some(captures) = self.regex.captures(class_name) else {
             return format!("Mock{}", class_name);
         };
 
-        let mut mock_name = self.name_pattern.clone();
+        let mut name = self.name_pattern.clone();
         for i in 1..captures.len() {
-            mock_name = mock_name.replace(&format!("\\{i}"), captures.get(i).unwrap().as_str());
+            name = name.replace(&format!("\\{i}"), captures.get(i).unwrap().as_str());
         }
-        mock_name
+        name
     }
 }
 
@@ -90,14 +110,14 @@ mod tests {
     #[test]
     fn sed_namer_replaces_matches() {
         let namer = SedReplacement::from_sed_replacement(r"s/Ifc(.*)/Mock\1/").unwrap();
-        assert_eq!(namer.mock_name("IfcMyType"), "MockMyType");
+        assert_eq!(namer.name("IfcMyType"), "MockMyType");
     }
 
     #[test]
     fn sed_namer_defaults_to_prefix() {
         let namer = SedReplacement::from_sed_replacement(r"s/Ifc(.*)/Mock\1/").unwrap();
-        assert_eq!(namer.mock_name("IMyType"), "MockIMyType");
-        assert_eq!(namer.mock_name("MyIfcType"), "MockMyIfcType");
+        assert_eq!(namer.name("IMyType"), "MockIMyType");
+        assert_eq!(namer.name("MyIfcType"), "MockMyIfcType");
     }
 
     #[test]
