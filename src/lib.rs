@@ -76,8 +76,8 @@ pub struct Mock {
 /// Representation of a mock header produced by Mocksmith.
 #[derive(Debug, PartialEq)]
 pub struct MockHeader {
-    /// Path to the header file of the mocked class
-    pub parent_header: Option<PathBuf>,
+    /// Path to the header file of the mocked classes
+    pub source_header: Option<PathBuf>,
     /// Name of the mocked classes
     pub parent_names: Vec<String>,
     /// Name of the mocks, same order as `parent_name`
@@ -220,7 +220,7 @@ impl Mocksmith {
         let mut header = self
             .generator
             .header(header_path.as_str(), &classes, &mock_names);
-        header.parent_header = Some(file.to_path_buf());
+        header.source_header = Some(file.to_path_buf());
         Ok(header)
     }
 
