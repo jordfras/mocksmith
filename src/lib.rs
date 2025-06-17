@@ -213,9 +213,9 @@ impl Mocksmith {
             .collect::<Vec<_>>();
 
         let header_path = if self.include_paths.is_empty() {
-            header_path(file, &self.include_paths)
-        } else {
             header_path(file, &[PathBuf::from(".")])
+        } else {
+            header_path(file, &self.include_paths)
         };
         let mut header = self
             .generator
