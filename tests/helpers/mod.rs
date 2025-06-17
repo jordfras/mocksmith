@@ -5,8 +5,15 @@ macro_rules! lines {
     () => {
         String::new()
     };
-    ($line:literal $( $rest:literal)*) => {
-        format!("{}\n{}", $line, lines!($($rest)*))
+    ($line:expr) => {
+        format!("{}\n", $line.to_string())
+    };
+    ($line:expr, $($rest:expr),*) => {
+        format!(
+            "{}\n{}",
+            $line,
+            lines!($($rest),*)
+        )
     };
 }
 

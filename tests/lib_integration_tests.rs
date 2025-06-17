@@ -16,10 +16,10 @@ fn simple_pure_virtual_function_can_be_mocked() {
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
         lines!(
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "  MOCK_METHOD(void, bar, (), (override));"
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, bar, (), (override));",
             "};"
         )
     );
@@ -51,11 +51,11 @@ fn various_return_types_and_argument_types_can_be_mocked() {
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
         lines!(
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "  MOCK_METHOD(std::string, bar, (const std::string & arg1, const char * arg2), (override));"
-            "  MOCK_METHOD(uint32_t, fizz, (uint32_t arg1, uint64_t arg2, int32_t arg3, int64_t arg4), (override));"
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(std::string, bar, (const std::string & arg1, const char * arg2), (override));",
+            "  MOCK_METHOD(uint32_t, fizz, (uint32_t arg1, uint64_t arg2, int32_t arg3, int64_t arg4), (override));",
             "};"
         )
     );
@@ -77,12 +77,12 @@ fn noexcept_and_const_qualifiers_are_added_when_needed() {
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
         lines!(
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "  MOCK_METHOD(void, bar, (), (const, override));"
-            "  MOCK_METHOD(void, fizz, (), (noexcept, override));"
-            "  MOCK_METHOD(void, buzz, (), (const, noexcept, override));"
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, bar, (), (const, override));",
+            "  MOCK_METHOD(void, fizz, (), (noexcept, override));",
+            "  MOCK_METHOD(void, buzz, (), (const, noexcept, override));",
             "};"
         )
     );
@@ -103,10 +103,10 @@ fn types_with_commas_are_wrapped_with_parenthesis() {
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
         lines!(
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "  MOCK_METHOD((std::map<int, int>), bar, ((const std::map<int, int> & arg)), (override));"
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD((std::map<int, int>), bar, ((const std::map<int, int> & arg)), (override));",
             "};"
         )
     );
@@ -130,11 +130,11 @@ fn protected_and_private_methods_are_mocked_as_public() {
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
         lines!(
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "  MOCK_METHOD(void, bar, (), (override));"
-            "  MOCK_METHOD(void, fizz, (), (override));"
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, bar, (), (override));",
+            "  MOCK_METHOD(void, fizz, (), (override));",
             "};"
         )
     );
@@ -214,10 +214,10 @@ fn configured_indent_level_is_used() {
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
         lines!(
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "    MOCK_METHOD(void, bar, (), (override));"
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "    MOCK_METHOD(void, bar, (), (override));",
             "};"
         )
     );
@@ -239,12 +239,12 @@ fn configured_nested_namespace_style_is_used() {
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
         lines!(
-            "namespace outer::inner {"
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "    MOCK_METHOD(void, bar, (), (override));"
-            "};"
+            "namespace outer::inner {",
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "    MOCK_METHOD(void, bar, (), (override));",
+            "};",
             "}"
         )
     );
@@ -253,12 +253,12 @@ fn configured_nested_namespace_style_is_used() {
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
         lines!(
-            "namespace outer { namespace inner {"
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "    MOCK_METHOD(void, bar, (), (override));"
-            "};"
+            "namespace outer { namespace inner {",
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "    MOCK_METHOD(void, bar, (), (override));",
+            "};",
             "}}"
         )
     );
@@ -278,10 +278,10 @@ fn configured_mock_name_function_is_used() {
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
         lines!(
-            "class SmithFoo : public Foo"
-            "{"
-            "public:"
-            "  MOCK_METHOD(void, bar, (), (override));"
+            "class SmithFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, bar, (), (override));",
             "};"
         )
     );
@@ -301,10 +301,10 @@ fn mocks_can_be_generated_from_file() {
     assert_mocks!(
         mocksmith.create_mocks_for_file(file.path()),
         lines!(
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "  MOCK_METHOD(void, bar, (), (override));"
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, bar, (), (override));",
             "};"
         )
     );
@@ -334,12 +334,13 @@ fn setting_include_path_finds_types_in_headers() {
             .as_str()
         ),
         lines!(
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "  MOCK_METHOD(void, bar, (MyEnum arg), (override));"
-            "  MOCK_METHOD(MyEnum, fizz, (), (override));"
-            "};")
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, bar, (MyEnum arg), (override));",
+            "  MOCK_METHOD(MyEnum, fizz, (), (override));",
+            "};"
+        )
     );
 }
 
@@ -358,10 +359,10 @@ fn generate_all_functions_mocks_non_virtual_functions() {
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
         lines!(
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "  MOCK_METHOD(void, bar, (), ());"
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, bar, (), ());",
             "};"
         )
     );
@@ -379,12 +380,12 @@ fn generate_all_functions_mocks_non_virtual_functions() {
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
         lines!(
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "  MOCK_METHOD(void, bar, (), ());"
-            "  MOCK_METHOD(void, fizz, (), (override));"
-            "  MOCK_METHOD(void, buzz, (), (override));"
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, bar, (), ());",
+            "  MOCK_METHOD(void, fizz, (), (override));",
+            "  MOCK_METHOD(void, buzz, (), (override));",
             "};"
         )
     );
@@ -417,11 +418,11 @@ fn generate_all_virtual_functions_mocks_virtual_functions_only() {
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
         lines!(
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "  MOCK_METHOD(void, fizz, (), (override));"
-            "  MOCK_METHOD(void, buzz, (), (override));"
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, fizz, (), (override));",
+            "  MOCK_METHOD(void, buzz, (), (override));",
             "};"
         )
     );
@@ -455,10 +456,10 @@ fn generate_pure_virtual_functions_mocks_pure_virtual_functions_only() {
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
         lines!(
-            "class MockFoo : public Foo"
-            "{"
-            "public:"
-            "  MOCK_METHOD(void, buzz, (), (override));"
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, buzz, (), (override));",
             "};"
         )
     );
