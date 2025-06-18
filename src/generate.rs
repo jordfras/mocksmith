@@ -66,8 +66,8 @@ impl Generator {
         );
         builder.add_line("#pragma once");
         builder.add_line("");
-        builder.add_line("#include <gmock/gmock.h>");
         builder.add_line(&format!("#include \"{parent_header_path}\""));
+        builder.add_line("#include <gmock/gmock.h>");
         builder.add_line("");
 
         // TODO: new()
