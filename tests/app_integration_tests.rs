@@ -27,6 +27,33 @@ fn some_mock(class_name: &str, mock_name: &str) -> String {
     )
 }
 
+// Creates a regex pattern for a header with some mocks
+fn header_pattern(source_path: &std::path::Path, mocks: &[String]) -> String {
+    let mocks_regex = mocks
+        .iter()
+        .map(|mock| {
+            // Quote characters for regex
+            mock.replace("{", "\\{")
+                .replace("}", "\\}")
+                .replace("(", "\\(")
+                .replace(")", "\\)")
+        })
+        .collect::<Vec<_>>()
+        .join("[[:space:]]*");
+    lines!(
+        "^// Automatically generated.*",
+        "#pragma once",
+        "",
+        format!(
+            "#include \".*/{}\"",
+            source_path.file_name().unwrap().to_string_lossy()
+        ),
+        "#include <gmock/gmock.h>",
+        "",
+        mocks_regex
+    )
+}
+
 #[test]
 fn input_from_stdin_produces_mock_only() {
     let mut mocksmith = Mocksmith::run(&[]);
@@ -34,8 +61,33 @@ fn input_from_stdin_produces_mock_only() {
     mocksmith.close_stdin();
 
     assert_ok!(mocksmith.expect_stdout(&some_mock("ISomething", "MockSomething")));
-
     assert!(mocksmith.wait().success());
+}
+
+#[test]
+fn input_from_file_produces_mock_only_when_output_to_stdout() {
+    let header = helpers::temp_file_from(&some_class("ISomething"));
+
+    let mut mocksmith = Mocksmith::run(&[header.path().to_string_lossy().as_ref()]);
+    assert_ok!(mocksmith.expect_stdout(&some_mock("ISomething", "MockSomething")));
+    assert!(mocksmith.wait().success());
+}
+
+#[test]
+fn input_from_file_produces_complete_header_when_output_to_file() {
+    let header = helpers::temp_file_from(&some_class("ISomething"));
+    let output = helpers::temp_file();
+
+    let mut mocksmith = Mocksmith::run(&[
+        &format!("--output-file={}", output.path().to_string_lossy()),
+        header.path().to_string_lossy().as_ref(),
+    ]);
+    assert!(mocksmith.wait().success());
+    let mock = std::fs::read_to_string(output.path()).unwrap();
+    assert_matches!(
+        mock,
+        &header_pattern(header.path(), &[some_mock("ISomething", "MockSomething")])
+    );
 }
 
 #[test]

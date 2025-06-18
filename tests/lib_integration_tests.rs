@@ -1,7 +1,7 @@
 mod assertions;
 mod helpers;
 
-use helpers::temp_file;
+use helpers::temp_file_from;
 use mocksmith::{Mocksmith, MocksmithError};
 
 #[test]
@@ -289,7 +289,7 @@ fn configured_mock_name_function_is_used() {
 
 #[test]
 fn mocks_can_be_generated_from_file() {
-    let file = temp_file(
+    let file = temp_file_from(
         "
         class Foo {
         public:
@@ -312,7 +312,7 @@ fn mocks_can_be_generated_from_file() {
 
 #[test]
 fn setting_include_path_finds_types_in_headers() {
-    let temp_header = temp_file("enum MyEnum { VALUE = 1 };");
+    let temp_header = temp_file_from("enum MyEnum { VALUE = 1 };");
     let header_name = temp_header.path().file_name().unwrap().to_str().unwrap();
 
     // Include path must be set to the directory of the header file.
