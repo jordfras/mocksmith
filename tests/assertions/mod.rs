@@ -1,6 +1,7 @@
+// Asserts that an expression evaluates to `Ok` and returns the result.
 #[macro_export]
 macro_rules! assert_ok {
-    ( $expression:expr ) => {
+    ( $expression:expr ) => {{
         let result = $expression;
         match result {
             Ok(result) => result,
@@ -12,9 +13,28 @@ macro_rules! assert_ok {
                 );
             }
         }
+    }};
+}
+
+// Asserts that a string matches an expeted regex pattern.
+#[macro_export]
+macro_rules! assert_matches {
+    ($text:expr, $pattern:expr) => {
+        let text = $text;
+        let pattern = $pattern;
+        if !regex::Regex::new(pattern)
+            .expect("Failed to compile regex")
+            .is_match(&text)
+        {
+            panic!(
+                "The text:\n'{}'\ndoes not match the pattern:\n'{}'",
+                text, pattern
+            );
+        }
     };
 }
 
+// Asserts that a collection of mocks matches the expected mocks.
 #[macro_export]
 macro_rules! assert_mocks {
     ($actual_mocks:expr $(, $expected_mock:expr)*) => {
