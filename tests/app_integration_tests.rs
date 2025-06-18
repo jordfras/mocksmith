@@ -27,6 +27,33 @@ fn some_mock(class_name: &str, mock_name: &str) -> String {
     )
 }
 
+// Creates a regex pattern for a header with some mocks
+fn header_pattern(source_path: &std::path::Path, mocks: &[String]) -> String {
+    let mocks_regex = mocks
+        .iter()
+        .map(|mock| {
+            // Quote characters for regex
+            mock.replace("{", "\\{")
+                .replace("}", "\\}")
+                .replace("(", "\\(")
+                .replace(")", "\\)")
+        })
+        .collect::<Vec<_>>()
+        .join("[[:space:]]*");
+    lines!(
+        "^// Automatically generated.*",
+        "#pragma once",
+        "",
+        format!(
+            "#include \".*/{}\"",
+            source_path.file_name().unwrap().to_string_lossy()
+        ),
+        "#include <gmock/gmock.h>",
+        "",
+        mocks_regex
+    )
+}
+
 #[test]
 fn input_from_stdin_produces_mock_only() {
     let mut mocksmith = Mocksmith::run(&[]);
@@ -34,7 +61,19 @@ fn input_from_stdin_produces_mock_only() {
     mocksmith.close_stdin();
 
     assert_ok!(mocksmith.expect_stdout(&some_mock("ISomething", "MockSomething")));
+    assert!(mocksmith.wait().success());
+}
 
+#[test]
+fn input_from_file_produces_complete_header() {
+    let file = helpers::temp_file(&some_class("ISomething"));
+
+    let mut mocksmith = Mocksmith::run(&[file.path().to_string_lossy().as_ref()]);
+    let mock = assert_ok!(mocksmith.read_stdout());
+    assert_matches!(
+        mock,
+        &header_pattern(file.path(), &[some_mock("ISomething", "MockSomething")])
+    );
     assert!(mocksmith.wait().success());
 }
 
