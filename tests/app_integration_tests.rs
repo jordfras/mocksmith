@@ -65,16 +65,29 @@ fn input_from_stdin_produces_mock_only() {
 }
 
 #[test]
-fn input_from_file_produces_complete_header() {
-    let file = helpers::temp_file(&some_class("ISomething"));
+fn input_from_file_produces_mock_only_when_output_to_stdout() {
+    let header = helpers::temp_file_from(&some_class("ISomething"));
 
-    let mut mocksmith = Mocksmith::run(&[file.path().to_string_lossy().as_ref()]);
-    let mock = assert_ok!(mocksmith.read_stdout());
+    let mut mocksmith = Mocksmith::run(&[header.path().to_string_lossy().as_ref()]);
+    assert_ok!(mocksmith.expect_stdout(&some_mock("ISomething", "MockSomething")));
+    assert!(mocksmith.wait().success());
+}
+
+#[test]
+fn input_from_file_produces_complete_header_when_output_to_file() {
+    let header = helpers::temp_file_from(&some_class("ISomething"));
+    let output = helpers::temp_file();
+
+    let mut mocksmith = Mocksmith::run(&[
+        &format!("--output-file={}", output.path().to_string_lossy()),
+        header.path().to_string_lossy().as_ref(),
+    ]);
+    assert!(mocksmith.wait().success());
+    let mock = std::fs::read_to_string(output.path()).unwrap();
     assert_matches!(
         mock,
-        &header_pattern(file.path(), &[some_mock("ISomething", "MockSomething")])
+        &header_pattern(header.path(), &[some_mock("ISomething", "MockSomething")])
     );
-    assert!(mocksmith.wait().success());
 }
 
 #[test]
