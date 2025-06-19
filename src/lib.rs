@@ -240,7 +240,7 @@ impl Mocksmith {
         if let Some(diagnostic) = tu
             .get_diagnostics()
             .iter()
-            .filter(|diagnostic| diagnostic.get_severity() == clang::diagnostic::Severity::Error)
+            .filter(|diagnostic| diagnostic.get_severity() >= clang::diagnostic::Severity::Error)
             .nth(0)
         {
             let location = diagnostic.get_location().get_file_location();
