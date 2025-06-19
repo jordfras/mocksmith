@@ -255,7 +255,15 @@ impl Mocksmith {
     }
 
     fn clang_arguments(&self) -> Vec<String> {
-        let mut arguments = vec!["--language=c++".to_string()];
+        let mut arguments = vec![
+            // Mocksmith is for generating mocks for C++
+            "--language=c++".to_string(),
+            // Default to C++17 standard which should be sufficient for most use cases and
+            // fully supported from Clang 5
+            "-std=c++17".to_string(),
+            // Since we normally process header files, ignore warning about #pragma once
+            "-Wno-pragma-once-outside-header".to_string(),
+        ];
         for path in &self.include_paths {
             arguments.push(format!("-I{}", path.display()));
         }
