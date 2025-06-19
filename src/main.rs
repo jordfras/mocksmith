@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use mocksmith::{Mocksmith, naming};
+use mocksmith::{MockHeader, Mocksmith, naming};
 
 /// Generates mocks for the Google Mock framework (gmock) from C++ header files. If no
 /// header files are provided, stdin is read and mocks are generated for the content.
@@ -106,6 +106,16 @@ fn main() -> anyhow::Result<()> {
             .for_each(|mock| {
                 print!("{}", mock.code);
             });
+    } else if arguments.output_dir.is_none() && arguments.output_file.is_none() {
+        for header in arguments.header {
+            mocksmith
+                .create_mocks_for_file(header.as_path())
+                .with_context(|| format!("Could not create mocks for file {}", header.display()))?
+                .into_iter()
+                .for_each(|mock| {
+                    print!("{}", mock.code);
+                });
+        }
     } else {
         // TODO: Test what happens if we have multiple headers and one fails
         let headers = arguments
@@ -121,7 +131,7 @@ fn main() -> anyhow::Result<()> {
                         )
                     })
             })
-            .collect::<anyhow::Result<Vec<_>>>()?;
+            .collect::<anyhow::Result<Vec<MockHeader>>>()?;
 
         if let Some(output_file) = arguments.output_file {
             let content = headers
@@ -135,9 +145,7 @@ fn main() -> anyhow::Result<()> {
                 maybe_write_file(&output_file, &header.code, arguments.always_write)
             })?;
         } else {
-            headers
-                .into_iter()
-                .for_each(|header| print!("{}", header.code));
+            panic!("Expected either output file or output directory to be specified")
         }
     }
 
