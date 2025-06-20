@@ -30,14 +30,14 @@ struct Arguments {
     /// If set, all generated mocks are written to the specified file. If neither output
     /// file or directory is specified, the mocks are printed to stdout. Input from stdin
     /// always generates output to stdout.
-    #[arg(short = 'o', long, group = "output")]
+    #[arg(short = 'o', long, group = "output", requires = "header")]
     output_file: Option<PathBuf>,
 
     /// If set, all generated mocks are written to files in the specified directory.
     /// Files are after the file of mocks' source class header file. If neither output
     /// file or directory is specified, the mocks are printed to stdout. Input from stdin
     /// alwyas generates output to stdout.
-    #[arg(short = 'd', long, group = "output")]
+    #[arg(short = 'd', long, group = "output", requires = "header")]
     output_dir: Option<PathBuf>,
 
     /// Forces writing output files without checking if the content has changed.
