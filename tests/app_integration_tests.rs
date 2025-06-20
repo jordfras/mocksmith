@@ -91,6 +91,24 @@ fn input_from_file_produces_complete_header_when_output_to_file() {
 }
 
 #[test]
+fn input_from_file_produces_complete_header_when_output_to_dir() {
+    let header = helpers::temp_file_from(&some_class("ISomething"));
+    let output_dir = helpers::temp_dir();
+
+    let mut mocksmith = Mocksmith::run(&[
+        &format!("--output-dir={}", output_dir.path().to_string_lossy()),
+        header.path().to_string_lossy().as_ref(),
+    ]);
+    assert!(mocksmith.wait().success());
+    let mock = std::fs::read_to_string(output_dir.path().join("MockSomething.h"))
+        .expect("Mock file not found");
+    assert_matches!(
+        mock,
+        &header_pattern(header.path(), &[some_mock("ISomething", "MockSomething")])
+    );
+}
+
+#[test]
 fn mocks_can_be_named_with_sed_style_regex() {
     let mut mocksmith = Mocksmith::run(&[r"--name-mock=s/I(.*)/Fake\1/"]);
     mocksmith.write_stdin(&some_class("ISomething"));
