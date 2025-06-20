@@ -109,6 +109,95 @@ fn input_from_file_produces_complete_header_when_output_to_dir() {
 }
 
 #[test]
+fn multiple_classes_in_file_produces_single_header_when_output_to_file() {
+    let header = helpers::temp_file_from(&format!(
+        "{}\n\n{}",
+        some_class("ISomething"),
+        some_class("IOther")
+    ));
+    let output = helpers::temp_file();
+
+    let mut mocksmith = Mocksmith::run(&[
+        &format!("--output-file={}", output.path().to_string_lossy()),
+        header.path().to_string_lossy().as_ref(),
+    ]);
+    assert!(mocksmith.wait().success());
+
+    // Both mocks should be in the file
+    let mocks = std::fs::read_to_string(output.path()).unwrap();
+    assert_matches!(
+        &mocks,
+        &header_pattern(
+            header.path(),
+            &[
+                some_mock("ISomething", "MockSomething"),
+                some_mock("IOther", "MockOther")
+            ]
+        )
+    );
+}
+
+#[test]
+fn multiple_classes_in_file_produces_single_header_when_output_to_dir() {
+    let header = helpers::temp_file_from(&format!(
+        "{}\n\n{}",
+        some_class("ISomething"),
+        some_class("IOther")
+    ));
+    let output_dir = helpers::temp_dir();
+
+    let mut mocksmith = Mocksmith::run(&[
+        &format!("--output-dir={}", output_dir.path().to_string_lossy()),
+        header.path().to_string_lossy().as_ref(),
+    ]);
+    assert!(mocksmith.wait().success());
+
+    // Both mocks should be in the file
+    let file_name = format!(
+        "{}_mocks.h",
+        header.path().file_stem().unwrap().to_string_lossy()
+    );
+    let mocks = std::fs::read_to_string(output_dir.path().join(file_name)).unwrap();
+    assert_matches!(
+        &mocks,
+        &header_pattern(
+            header.path(),
+            &[
+                some_mock("ISomething", "MockSomething"),
+                some_mock("IOther", "MockOther")
+            ]
+        )
+    );
+}
+
+// It is not possible to figure out the path to the header of the classes that are mocked,
+// so we cannot produce a mock header to output to file.
+#[test]
+fn input_from_stdin_doesnt_work_when_output_to_file_or_dir() {
+    let output = helpers::temp_file();
+    let mut mocksmith = Mocksmith::run(&[&format!(
+        "--output-file={}",
+        output.path().to_string_lossy()
+    )]);
+    mocksmith.write_stdin(&some_class("ISomething"));
+    mocksmith.close_stdin();
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("required arguments were not provided"));
+    assert!(!mocksmith.wait().success());
+
+    let output_dir = helpers::temp_dir();
+    let mut mocksmith = Mocksmith::run(&[&format!(
+        "--output-dir={}",
+        output_dir.path().to_string_lossy()
+    )]);
+    mocksmith.write_stdin(&some_class("ISomething"));
+    mocksmith.close_stdin();
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("required arguments were not provided"));
+    assert!(!mocksmith.wait().success());
+}
+
+#[test]
 fn mocks_can_be_named_with_sed_style_regex() {
     let mut mocksmith = Mocksmith::run(&[r"--name-mock=s/I(.*)/Fake\1/"]);
     mocksmith.write_stdin(&some_class("ISomething"));
