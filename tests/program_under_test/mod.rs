@@ -67,6 +67,10 @@ impl Mocksmith {
         Self::read(&mut self.stdout, "stdout")
     }
 
+    pub fn read_stderr(&mut self) -> Result<String, std::io::Error> {
+        Self::read(&mut self.stderr, "stderr")
+    }
+
     /// Reads some text from the program's stdout and checks that it matches the expected text,
     /// otherwise it returns an error
     pub fn expect_stdout(&mut self, expected_text: &str) -> Result<(), std::io::Error> {
@@ -83,7 +87,7 @@ impl Mocksmith {
     /// Reads some text from the program's stderr and checks that it matches the expected text,
     /// otherwise it returns an error
     pub fn _expect_stderr(&mut self, expected_text: &str) -> Result<(), std::io::Error> {
-        let read_text = Self::read(&mut self.stderr, "stderr")?;
+        let read_text = self.read_stderr()?;
         if read_text == expected_text {
             Ok(())
         } else {
