@@ -1,4 +1,5 @@
 mod assertions;
+#[allow(dead_code)]
 mod helpers;
 
 use helpers::temp_file_from;
