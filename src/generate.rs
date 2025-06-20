@@ -25,7 +25,7 @@ impl crate::Mock {
 impl crate::MockHeader {
     fn new() -> Self {
         Self {
-            parent_header: None,
+            source_header: None,
             parent_names: Vec::new(),
             names: Vec::new(),
             code: String::new(),

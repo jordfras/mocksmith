@@ -82,7 +82,7 @@ fn main() -> anyhow::Result<()> {
             Box::new(move |header: &mocksmith::MockHeader| {
                 namer.name(
                     &header
-                        .parent_header
+                        .source_header
                         .as_ref()
                         .expect("")
                         .file_name()
