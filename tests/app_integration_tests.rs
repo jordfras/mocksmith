@@ -275,3 +275,43 @@ fn mocks_can_be_named_with_sed_style_regex() {
     assert_ok!(mocksmith.expect_stdout(&some_mock("ISomething", "FakeSomething")));
     assert!(mocksmith.wait().success());
 }
+
+#[test]
+fn files_can_be_named_with_sed_style_regex() {
+    let header = helpers::temp_file_from(&some_class("ISomething"));
+    let output_dir = helpers::temp_dir();
+
+    let mut mocksmith = Mocksmith::run(&[
+        &format!("--output-dir={}", output_dir.path().to_string_lossy()),
+        r"--name-output-file=s/(.*)/mocks_from_\1/",
+        header.path().to_string_lossy().as_ref(),
+    ]);
+    assert!(mocksmith.wait().success());
+    let mock = std::fs::read_to_string(output_dir.path().join(format!(
+        "mocks_from_{}",
+        header.path().file_name().unwrap().to_string_lossy()
+    )))
+    .expect("Mock file not found");
+    assert_matches!(
+        mock,
+        &header_pattern(
+            &[header.path()],
+            &[some_mock("ISomething", "MockSomething")]
+        )
+    );
+}
+
+#[test]
+fn files_cant_be_named_with_sed_style_regex_when_output_to_file() {
+    let header = helpers::temp_file_from(&some_class("ISomething"));
+    let output = helpers::temp_file();
+
+    let mut mocksmith = Mocksmith::run(&[
+        &format!("--output-file={}", output.path().to_string_lossy()),
+        r"--name-output-file=s/(.*)/mocks_from_\1/",
+        header.path().to_string_lossy().as_ref(),
+    ]);
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("--output-dir is required"));
+    assert!(!mocksmith.wait().success());
+}

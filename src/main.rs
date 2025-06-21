@@ -24,12 +24,7 @@ struct Arguments {
 
     /// A sed style regex replacement string to convert input header file names to output
     /// header file names
-    #[arg(
-        short = 'f',
-        long = "name-output-file",
-        requires = "output_dir",
-        requires = "header"
-    )]
+    #[arg(short = 'f', long = "name-output-file", requires = "output_dir")]
     name_output_file_sed_replacement: Option<String>,
 
     /// If set, all generated mocks are written to the specified file. If neither output
@@ -67,8 +62,19 @@ fn maybe_write_file(file: &Path, content: &str, always_write: bool) -> anyhow::R
     Ok(())
 }
 
-fn main() -> anyhow::Result<()> {
+fn arguments() -> Arguments {
     let arguments = Arguments::parse();
+    // For some reason 'requires = "output_dir"' does not seem to work. Perhaps because
+    // it is in a group.
+    if arguments.name_output_file_sed_replacement.is_some() && arguments.output_dir.is_none() {
+        eprintln!("The argument --output-dir is required when --name-output-file is used");
+        std::process::exit(2);
+    }
+    arguments
+}
+
+fn main() -> anyhow::Result<()> {
+    let arguments = arguments();
 
     let mut mocksmith = Mocksmith::new()
         .context("Could not create Mocksmith instance")?
