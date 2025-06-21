@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 // Finds the shortest relative path to a header file from a list of include paths
-pub(crate) fn header_path(header: &Path, include_paths: &[PathBuf]) -> String {
+pub(crate) fn header_include_path(header: &Path, include_paths: &[PathBuf]) -> String {
     let canonic_header = canonicalize(header);
 
     let mut maybe_best_match: Option<PathBuf> = None;
@@ -43,10 +43,10 @@ mod tests {
             PathBuf::from("/usr/local/include"),
         ];
 
-        let result = header_path(&PathBuf::from("/usr/include/header.h"), &include_paths);
+        let result = header_include_path(&PathBuf::from("/usr/include/header.h"), &include_paths);
         assert_eq!(result, "header.h");
 
-        let result = header_path(
+        let result = header_include_path(
             &PathBuf::from("/usr/local/include/another/header.h"),
             &include_paths,
         );
@@ -60,13 +60,13 @@ mod tests {
             PathBuf::from("/usr/local/include"),
         ];
 
-        let result = header_path(
+        let result = header_include_path(
             &PathBuf::from("/home/user/project/include/header.h"),
             &include_paths,
         );
         assert_eq!(result, "../../home/user/project/include/header.h");
 
-        let result = header_path(&PathBuf::from("/usr/local/header.h"), &include_paths);
+        let result = header_include_path(&PathBuf::from("/usr/local/header.h"), &include_paths);
         assert_eq!(result, "../header.h");
     }
 
@@ -79,16 +79,16 @@ mod tests {
             PathBuf::from(r"C:\temp"),
         ];
 
-        let result = header_path(&PathBuf::from(r"C:\Windows\header.h"), &include_paths);
+        let result = header_include_path(&PathBuf::from(r"C:\Windows\header.h"), &include_paths);
         assert_eq!(result, "header.h");
 
-        let result = header_path(
+        let result = header_include_path(
             &PathBuf::from(r"C:\Windows\include\header.h"),
             &include_paths,
         );
         assert_eq!(result, "include/header.h");
 
-        let result = header_path(&PathBuf::from(r"C:\temp\header.h"), &include_paths);
+        let result = header_include_path(&PathBuf::from(r"C:\temp\header.h"), &include_paths);
         assert_eq!(result, "header.h");
     }
 

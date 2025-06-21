@@ -14,7 +14,7 @@ pub(crate) struct Generator {
 impl crate::Mock {
     fn from(parent: &model::ClassToMock, name: &str, builder: builder::CodeBuilder) -> Self {
         Self {
-            parent_header: None,
+            source_file: None,
             parent_name: parent.name(),
             name: name.to_string(),
             code: builder.build(),
@@ -25,7 +25,7 @@ impl crate::Mock {
 impl crate::MockHeader {
     fn new() -> Self {
         Self {
-            source_header: None,
+            source_files: Vec::new(),
             parent_names: Vec::new(),
             names: Vec::new(),
             code: String::new(),
@@ -56,7 +56,7 @@ impl Generator {
 
     pub(crate) fn header(
         &self,
-        parent_header_path: &str,
+        source_file_paths: &[String],
         classes: &[model::ClassToMock],
         mock_names: &[String],
     ) -> crate::MockHeader {
@@ -66,11 +66,12 @@ impl Generator {
         );
         builder.add_line("#pragma once");
         builder.add_line("");
-        builder.add_line(&format!("#include \"{parent_header_path}\""));
+        for path in source_file_paths {
+            builder.add_line(&format!("#include \"{path}\""));
+        }
         builder.add_line("#include <gmock/gmock.h>");
         builder.add_line("");
 
-        // TODO: new()
         let mut header = crate::MockHeader::new();
         for (class, mock_name) in classes.iter().zip(mock_names) {
             self.build_mock(&mut builder, class, mock_name);

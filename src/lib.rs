@@ -3,7 +3,7 @@ mod headerpath;
 mod model;
 pub mod naming;
 
-use headerpath::header_path;
+use headerpath::header_include_path;
 use std::{
     path::{Path, PathBuf},
     sync::{Mutex, MutexGuard, TryLockError},
@@ -64,7 +64,7 @@ impl MethodsToMockStrategy {
 #[derive(Debug, PartialEq)]
 pub struct Mock {
     /// Path to the header file of the mocked class
-    pub parent_header: Option<PathBuf>,
+    pub source_file: Option<PathBuf>,
     /// Name of the mocked class
     pub parent_name: String,
     /// Name of the mock
@@ -76,8 +76,8 @@ pub struct Mock {
 /// Representation of a mock header produced by Mocksmith.
 #[derive(Debug, PartialEq)]
 pub struct MockHeader {
-    /// Path to the header file of the mocked classes
-    pub source_header: Option<PathBuf>,
+    /// Path to the header files of the mocked classes
+    pub source_files: Vec<PathBuf>,
     /// Name of the mocked classes
     pub parent_names: Vec<String>,
     /// Name of the mocks, same order as `parent_name`
@@ -141,8 +141,11 @@ impl Mocksmith {
 
     /// Adds an include path to the list of paths to search for headers. If no include
     /// paths are set, the current directory is used.
-    pub fn include_path(mut self, include_path: &Path) -> Self {
-        self.include_paths.push(include_path.to_path_buf());
+    pub fn include_path<P>(mut self, include_path: P) -> Self
+    where
+        P: AsRef<Path>,
+    {
+        self.include_paths.push(include_path.as_ref().to_path_buf());
         self
     }
 
@@ -182,11 +185,14 @@ impl Mocksmith {
 
     /// Generates mocks for classes in the given file. If no appropriate classes to mock
     /// are found, an empty vector is returned.
-    pub fn create_mocks_for_file(&self, file: &Path) -> Result<Vec<Mock>> {
+    pub fn create_mocks_for_file<P>(&self, file: P) -> Result<Vec<Mock>>
+    where
+        P: AsRef<Path>,
+    {
         let index = clang::Index::new(&self.clang, true, false);
-        let mut mocks = self.create_mocks(self.tu_from_file(&index, file)?)?;
+        let mut mocks = self.create_mocks(self.tu_from_file(&index, file.as_ref())?)?;
         mocks.iter_mut().for_each(|m| {
-            m.parent_header = Some(file.to_path_buf());
+            m.source_file = Some(file.as_ref().to_path_buf());
         });
         Ok(mocks)
     }
@@ -200,10 +206,19 @@ impl Mocksmith {
 
     /// Generate the contents for a header file with mocks for classes in the give file.
     /// If no appropriate classes to mock are found, an error is returned.
-    pub fn create_mock_header_for_file(&self, file: &Path) -> Result<MockHeader> {
+    pub fn create_mock_header_for_files<P>(&self, files: &[P]) -> Result<MockHeader>
+    where
+        P: AsRef<Path>,
+    {
         let index = clang::Index::new(&self.clang, true, false);
-        let tu = self.tu_from_file(&index, file)?;
-        let classes = model::classes_in_translation_unit(&tu, self.methods_to_mock);
+        let tus: Vec<clang::TranslationUnit> = files
+            .iter()
+            .map(|f| self.tu_from_file(&index, f.as_ref()))
+            .collect::<Result<Vec<_>>>()?;
+        let classes: Vec<model::ClassToMock> = tus
+            .iter()
+            .flat_map(|tu| model::classes_in_translation_unit(tu, self.methods_to_mock))
+            .collect();
         if classes.is_empty() {
             return Err(MocksmithError::NothingToMock);
         }
@@ -212,16 +227,21 @@ impl Mocksmith {
             .map(|class| self.mock_name(class))
             .collect::<Vec<_>>();
 
-        let header_path = if self.include_paths.is_empty() {
-            header_path(file, &[PathBuf::from(".")])
-        } else {
-            header_path(file, &self.include_paths)
-        };
-        let mut header = self
-            .generator
-            .header(header_path.as_str(), &classes, &mock_names);
-        header.source_header = Some(file.to_path_buf());
+        let header_paths: Vec<String> = files
+            .iter()
+            .map(|f| self.header_include_path(f.as_ref()))
+            .collect();
+        let mut header = self.generator.header(&header_paths, &classes, &mock_names);
+        header.source_files = files.iter().map(|f| f.as_ref().to_path_buf()).collect();
         Ok(header)
+    }
+
+    fn header_include_path(&self, header_file: &Path) -> String {
+        if self.include_paths.is_empty() {
+            header_include_path(header_file, &[PathBuf::from(".")])
+        } else {
+            header_include_path(header_file, &self.include_paths)
+        }
     }
 
     fn create_mocks(&self, tu: clang::TranslationUnit) -> Result<Vec<Mock>> {

@@ -24,7 +24,12 @@ struct Arguments {
 
     /// A sed style regex replacement string to convert input header file names to output
     /// header file names
-    #[arg(short = 'f', long = "name-output-file", requires = "output_dir")]
+    #[arg(
+        short = 'f',
+        long = "name-output-file",
+        requires = "output_dir",
+        requires = "header"
+    )]
     name_output_file_sed_replacement: Option<String>,
 
     /// If set, all generated mocks are written to the specified file. If neither output
@@ -80,13 +85,13 @@ fn main() -> anyhow::Result<()> {
             let namer =
                 naming::SedReplacement::from_sed_replacement(name_output_file_sed_replacement)?;
             Box::new(move |header: &mocksmith::MockHeader| {
+                // Since only used with --output_dir there should be exactly one source
+                // header per mock output file
+                assert!(header.source_files.len() == 1);
                 namer.name(
-                    &header
-                        .source_header
-                        .as_ref()
-                        .expect("")
+                    &header.source_files[0]
                         .file_name()
-                        .expect("")
+                        .expect("Input source path should be a file")
                         .to_string_lossy(),
                 )
             })
@@ -106,24 +111,21 @@ fn main() -> anyhow::Result<()> {
             .for_each(|mock| {
                 print!("{}", mock.code);
             });
-    } else if arguments.output_dir.is_none() && arguments.output_file.is_none() {
-        for header in arguments.header {
-            mocksmith
-                .create_mocks_for_file(header.as_path())
-                .with_context(|| format!("Could not create mocks for file {}", header.display()))?
-                .into_iter()
-                .for_each(|mock| {
-                    print!("{}", mock.code);
-                });
-        }
-    } else {
+    } else if arguments.output_file.is_some() {
+        let header = mocksmith.create_mock_header_for_files(&arguments.header)?;
+        maybe_write_file(
+            &arguments.output_file.unwrap(),
+            &header.code,
+            arguments.always_write,
+        )?;
+    } else if arguments.output_dir.is_some() {
         // TODO: Test what happens if we have multiple headers and one fails
         let headers = arguments
             .header
             .iter()
             .map(|header| {
                 mocksmith
-                    .create_mock_header_for_file(header)
+                    .create_mock_header_for_files(&[header])
                     .with_context(|| {
                         format!(
                             "Could not create mock header from file {}",
@@ -132,20 +134,20 @@ fn main() -> anyhow::Result<()> {
                     })
             })
             .collect::<anyhow::Result<Vec<MockHeader>>>()?;
-
-        if let Some(output_file) = arguments.output_file {
-            let content = headers
+        let output_dir = arguments.output_dir.unwrap();
+        headers.into_iter().try_for_each(|header| {
+            let output_file = output_dir.join(name_output_file(&header));
+            maybe_write_file(&output_file, &header.code, arguments.always_write)
+        })?;
+    } else {
+        for header in arguments.header {
+            mocksmith
+                .create_mocks_for_file(header.as_path())
+                .with_context(|| format!("Could not create mocks for file {}", header.display()))?
                 .into_iter()
-                .map(|header| header.code)
-                .collect::<String>();
-            maybe_write_file(&output_file, &content, arguments.always_write)?;
-        } else if let Some(output_dir) = arguments.output_dir {
-            headers.into_iter().try_for_each(|header| {
-                let output_file = output_dir.join(name_output_file(&header));
-                maybe_write_file(&output_file, &header.code, arguments.always_write)
-            })?;
-        } else {
-            panic!("Expected either output file or output directory to be specified")
+                .for_each(|mock| {
+                    print!("{}", mock.code);
+                });
         }
     }
 

@@ -25,10 +25,10 @@ pub fn default_name_mock(class_name: &str) -> String {
 
 /// Default function to generate output file names for mocks.
 pub fn default_name_output_file(header: &MockHeader) -> String {
-    // Use same file extension as header of the mocked classes, if available
+    // Use same file extension as the first header of the mocked classes, if available
     let extension = header
-        .source_header
-        .as_ref()
+        .source_files
+        .first()
         .map(|ph| ph.extension().unwrap_or(std::ffi::OsStr::new("h")))
         .unwrap_or(std::ffi::OsStr::new("h"));
 
@@ -40,9 +40,10 @@ pub fn default_name_output_file(header: &MockHeader) -> String {
         return file_name.to_string_lossy().to_string();
     }
 
-    // Otherwise use the same name as the source file, with a "_mocks" suffix to the stem
-    if let Some(parent_header) = &header.source_header {
-        if let Some(stem) = parent_header.file_stem() {
+    // Otherwise use the same name of the single source file, with a "_mocks" suffix to
+    // the stem
+    if header.source_files.len() == 1 {
+        if let Some(stem) = header.source_files[0].file_stem() {
             let mut file_name = stem.to_os_string();
             file_name.push("_mocks");
             file_name.push(".");
@@ -124,7 +125,7 @@ mod tests {
     #[test]
     fn default_name_output_file_uses_mock_name_when_only_one_mock() {
         let info = MockHeader {
-            source_header: Some(std::path::PathBuf::from("source.h")),
+            source_files: vec![std::path::PathBuf::from("source.h")],
             parent_names: vec!["ISomething".to_string()],
             names: vec!["MockSomething".to_string()],
             code: String::new(),
@@ -136,7 +137,7 @@ mod tests {
     #[test]
     fn default_name_output_file_uses_extension_from_source_file() {
         let info = MockHeader {
-            source_header: Some(std::path::PathBuf::from("source.hpp")),
+            source_files: vec![std::path::PathBuf::from("source.hpp")],
             parent_names: vec!["ISomething".to_string()],
             names: vec!["MockSomething".to_string()],
             code: String::new(),
@@ -148,7 +149,7 @@ mod tests {
     #[test]
     fn default_name_output_file_uses_source_file_with_suffix_when_several_mocks() {
         let info = MockHeader {
-            source_header: Some(std::path::PathBuf::from("source.hpp")),
+            source_files: vec![std::path::PathBuf::from("source.hpp")],
             parent_names: vec!["ISomething".to_string(), "IOther".to_string()],
             names: vec!["MockSomething".to_string(), "MockOther".to_string()],
             code: String::new(),
@@ -160,7 +161,7 @@ mod tests {
     #[test]
     fn default_name_output_file_falls_back_to_mocks_h() {
         let info = MockHeader {
-            source_header: None,
+            source_files: Vec::new(),
             parent_names: vec!["ISomething".to_string(), "IOther".to_string()],
             names: vec!["MockSomething".to_string(), "MockOther".to_string()],
             code: String::new(),
