@@ -25,7 +25,7 @@ impl crate::Mock {
 impl crate::MockHeader {
     fn new() -> Self {
         Self {
-            source_header: None,
+            source_headers: Vec::new(),
             parent_names: Vec::new(),
             names: Vec::new(),
             code: String::new(),
@@ -56,7 +56,7 @@ impl Generator {
 
     pub(crate) fn header(
         &self,
-        parent_header_path: &str,
+        parent_header_paths: &[String],
         classes: &[model::ClassToMock],
         mock_names: &[String],
     ) -> crate::MockHeader {
@@ -66,7 +66,9 @@ impl Generator {
         );
         builder.add_line("#pragma once");
         builder.add_line("");
-        builder.add_line(&format!("#include \"{parent_header_path}\""));
+        for path in parent_header_paths {
+            builder.add_line(&format!("#include \"{path}\""));
+        }
         builder.add_line("#include <gmock/gmock.h>");
         builder.add_line("");
 

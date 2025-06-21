@@ -24,7 +24,12 @@ struct Arguments {
 
     /// A sed style regex replacement string to convert input header file names to output
     /// header file names
-    #[arg(short = 'f', long = "name-output-file", requires = "output_dir")]
+    #[arg(
+        short = 'f',
+        long = "name-output-file",
+        requires = "output_dir",
+        requires = "header"
+    )]
     name_output_file_sed_replacement: Option<String>,
 
     /// If set, all generated mocks are written to the specified file. If neither output
@@ -80,13 +85,13 @@ fn main() -> anyhow::Result<()> {
             let namer =
                 naming::SedReplacement::from_sed_replacement(name_output_file_sed_replacement)?;
             Box::new(move |header: &mocksmith::MockHeader| {
+                // Since only used with --output_dir there should be exactly one source
+                // header per mock output file
+                assert!(header.source_headers.len() == 1);
                 namer.name(
-                    &header
-                        .source_header
-                        .as_ref()
-                        .expect("")
+                    &header.source_headers[0]
                         .file_name()
-                        .expect("")
+                        .expect("Input source path should be a file")
                         .to_string_lossy(),
                 )
             })
@@ -117,21 +122,27 @@ fn main() -> anyhow::Result<()> {
                 });
         }
     } else {
-        // TODO: Test what happens if we have multiple headers and one fails
-        let headers = arguments
-            .header
-            .iter()
-            .map(|header| {
-                mocksmith
-                    .create_mock_header_for_file(header)
-                    .with_context(|| {
-                        format!(
-                            "Could not create mock header from file {}",
-                            header.display()
-                        )
-                    })
-            })
-            .collect::<anyhow::Result<Vec<MockHeader>>>()?;
+        let headers = if arguments.output_file.is_some() {
+            vec![mocksmith.create_mock_header_for_files(&arguments.header)?]
+        } else if arguments.output_dir.is_some() {
+            // TODO: Test what happens if we have multiple headers and one fails
+            arguments
+                .header
+                .iter()
+                .map(|header| {
+                    mocksmith
+                        .create_mock_header_for_files(&[header])
+                        .with_context(|| {
+                            format!(
+                                "Could not create mock header from file {}",
+                                header.display()
+                            )
+                        })
+                })
+                .collect::<anyhow::Result<Vec<MockHeader>>>()?
+        } else {
+            panic!("There be gremlins in the logic");
+        };
 
         if let Some(output_file) = arguments.output_file {
             let content = headers
