@@ -210,6 +210,35 @@ fn multiple_files_produce_single_header_when_output_to_file() {
     );
 }
 
+#[test]
+fn multiple_files_produce_multiple_headers_when_output_to_dir() {
+    let header1 = helpers::temp_file_from(&some_class("ISomething"));
+    let header2 = helpers::temp_file_from(&some_class("IOther"));
+    let output_dir = helpers::temp_dir();
+
+    let mut mocksmith = Mocksmith::run(&[
+        &format!("--output-dir={}", output_dir.path().to_string_lossy()),
+        header1.path().to_string_lossy().as_ref(),
+        header2.path().to_string_lossy().as_ref(),
+    ]);
+    assert!(mocksmith.wait().success());
+
+    // One file per mock
+    let mock1 = std::fs::read_to_string(output_dir.path().join("MockSomething.h")).unwrap();
+    let mock2 = std::fs::read_to_string(output_dir.path().join("MockOther.h")).unwrap();
+    assert_matches!(
+        &mock1,
+        &header_pattern(
+            &[header1.path()],
+            &[some_mock("ISomething", "MockSomething"),]
+        )
+    );
+    assert_matches!(
+        &mock2,
+        &header_pattern(&[header2.path()], &[some_mock("IOther", "MockOther"),])
+    );
+}
+
 // It is not possible to figure out the path to the header of the classes that are mocked,
 // so we cannot produce a mock header to output to file.
 #[test]
