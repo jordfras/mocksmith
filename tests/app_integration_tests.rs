@@ -220,3 +220,34 @@ fn files_can_be_named_with_sed_style_regex() {
         )
     );
 }
+
+#[test]
+fn output_file_is_not_written_if_unchanged_unless_forced() {
+    let source_file = temp_file_from(&some_class("ISomething"));
+    let output = temp_file();
+
+    let mut mocksmith = Mocksmith::run(&[
+        &format!("--output-file={}", output.path().to_string_lossy()),
+        source_file.path().to_string_lossy().as_ref(),
+    ]);
+    assert!(mocksmith.wait().success());
+    let first_change = output.as_file().metadata().unwrap().modified().unwrap();
+
+    let mut mocksmith = Mocksmith::run(&[
+        &format!("--output-file={}", output.path().to_string_lossy()),
+        source_file.path().to_string_lossy().as_ref(),
+    ]);
+    assert!(mocksmith.wait().success());
+    assert_eq!(
+        first_change,
+        output.as_file().metadata().unwrap().modified().unwrap(),
+    );
+
+    let mut mocksmith = Mocksmith::run(&[
+        "--always-write",
+        &format!("--output-file={}", output.path().to_string_lossy()),
+        source_file.path().to_string_lossy().as_ref(),
+    ]);
+    assert!(mocksmith.wait().success());
+    assert!(first_change < output.as_file().metadata().unwrap().modified().unwrap(),);
+}
