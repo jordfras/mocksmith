@@ -19,28 +19,28 @@ fn input_from_stdin_produces_mock_only() {
 
 #[test]
 fn input_from_file_produces_mock_only_when_output_to_stdout() {
-    let header = temp_file_from(&some_class("ISomething"));
+    let source_file = temp_file_from(&some_class("ISomething"));
 
-    let mut mocksmith = Mocksmith::run(&[header.path().to_string_lossy().as_ref()]);
+    let mut mocksmith = Mocksmith::run(&[source_file.path().to_string_lossy().as_ref()]);
     assert_ok!(mocksmith.expect_stdout(&some_mock("ISomething", "MockSomething")));
     assert!(mocksmith.wait().success());
 }
 
 #[test]
 fn input_from_file_produces_complete_header_when_output_to_file() {
-    let header = temp_file_from(&some_class("ISomething"));
+    let source_file = temp_file_from(&some_class("ISomething"));
     let output = temp_file();
 
     let mut mocksmith = Mocksmith::run(&[
         &format!("--output-file={}", output.path().to_string_lossy()),
-        header.path().to_string_lossy().as_ref(),
+        source_file.path().to_string_lossy().as_ref(),
     ]);
     assert!(mocksmith.wait().success());
     let mock = std::fs::read_to_string(output.path()).unwrap();
     assert_matches!(
         mock,
         &header_pattern(
-            &[header.path()],
+            &[source_file.path()],
             &[some_mock("ISomething", "MockSomething")]
         )
     );
@@ -48,12 +48,12 @@ fn input_from_file_produces_complete_header_when_output_to_file() {
 
 #[test]
 fn input_from_file_produces_complete_header_when_output_to_dir() {
-    let header = temp_file_from(&some_class("ISomething"));
+    let source_file = temp_file_from(&some_class("ISomething"));
     let output_dir = temp_dir();
 
     let mut mocksmith = Mocksmith::run(&[
         &format!("--output-dir={}", output_dir.path().to_string_lossy()),
-        header.path().to_string_lossy().as_ref(),
+        source_file.path().to_string_lossy().as_ref(),
     ]);
     assert!(mocksmith.wait().success());
     let mock = std::fs::read_to_string(output_dir.path().join("MockSomething.h"))
@@ -61,7 +61,7 @@ fn input_from_file_produces_complete_header_when_output_to_dir() {
     assert_matches!(
         mock,
         &header_pattern(
-            &[header.path()],
+            &[source_file.path()],
             &[some_mock("ISomething", "MockSomething")]
         )
     );
@@ -69,7 +69,7 @@ fn input_from_file_produces_complete_header_when_output_to_dir() {
 
 #[test]
 fn multiple_classes_in_file_produce_single_header_when_output_to_file() {
-    let header = temp_file_from(&format!(
+    let source_file = temp_file_from(&format!(
         "{}\n\n{}",
         some_class("ISomething"),
         some_class("IOther")
@@ -78,7 +78,7 @@ fn multiple_classes_in_file_produce_single_header_when_output_to_file() {
 
     let mut mocksmith = Mocksmith::run(&[
         &format!("--output-file={}", output.path().to_string_lossy()),
-        header.path().to_string_lossy().as_ref(),
+        source_file.path().to_string_lossy().as_ref(),
     ]);
     assert!(mocksmith.wait().success());
 
@@ -87,7 +87,7 @@ fn multiple_classes_in_file_produce_single_header_when_output_to_file() {
     assert_matches!(
         &mocks,
         &header_pattern(
-            &[header.path()],
+            &[source_file.path()],
             &[
                 some_mock("ISomething", "MockSomething"),
                 some_mock("IOther", "MockOther")
@@ -98,7 +98,7 @@ fn multiple_classes_in_file_produce_single_header_when_output_to_file() {
 
 #[test]
 fn multiple_classes_in_file_produce_single_header_when_output_to_dir() {
-    let header = temp_file_from(&format!(
+    let source_file = temp_file_from(&format!(
         "{}\n\n{}",
         some_class("ISomething"),
         some_class("IOther")
@@ -107,20 +107,20 @@ fn multiple_classes_in_file_produce_single_header_when_output_to_dir() {
 
     let mut mocksmith = Mocksmith::run(&[
         &format!("--output-dir={}", output_dir.path().to_string_lossy()),
-        header.path().to_string_lossy().as_ref(),
+        source_file.path().to_string_lossy().as_ref(),
     ]);
     assert!(mocksmith.wait().success());
 
     // Both mocks should be in the file
     let file_name = format!(
         "{}_mocks.h",
-        header.path().file_stem().unwrap().to_string_lossy()
+        source_file.path().file_stem().unwrap().to_string_lossy()
     );
     let mocks = std::fs::read_to_string(output_dir.path().join(file_name)).unwrap();
     assert_matches!(
         &mocks,
         &header_pattern(
-            &[header.path()],
+            &[source_file.path()],
             &[
                 some_mock("ISomething", "MockSomething"),
                 some_mock("IOther", "MockOther")
@@ -131,14 +131,14 @@ fn multiple_classes_in_file_produce_single_header_when_output_to_dir() {
 
 #[test]
 fn multiple_files_produce_single_header_when_output_to_file() {
-    let header1 = temp_file_from(&some_class("ISomething"));
-    let header2 = temp_file_from(&some_class("IOther"));
+    let source_file1 = temp_file_from(&some_class("ISomething"));
+    let source_file2 = temp_file_from(&some_class("IOther"));
     let output = temp_file();
 
     let mut mocksmith = Mocksmith::run(&[
         &format!("--output-file={}", output.path().to_string_lossy()),
-        header1.path().to_string_lossy().as_ref(),
-        header2.path().to_string_lossy().as_ref(),
+        source_file1.path().to_string_lossy().as_ref(),
+        source_file2.path().to_string_lossy().as_ref(),
     ]);
     assert!(mocksmith.wait().success());
 
@@ -147,7 +147,7 @@ fn multiple_files_produce_single_header_when_output_to_file() {
     assert_matches!(
         &mocks,
         &header_pattern(
-            &[header1.path(), header2.path()],
+            &[source_file1.path(), source_file2.path()],
             &[
                 some_mock("ISomething", "MockSomething"),
                 some_mock("IOther", "MockOther")
@@ -158,14 +158,14 @@ fn multiple_files_produce_single_header_when_output_to_file() {
 
 #[test]
 fn multiple_files_produce_multiple_headers_when_output_to_dir() {
-    let header1 = temp_file_from(&some_class("ISomething"));
-    let header2 = temp_file_from(&some_class("IOther"));
+    let source_file1 = temp_file_from(&some_class("ISomething"));
+    let source_file2 = temp_file_from(&some_class("IOther"));
     let output_dir = temp_dir();
 
     let mut mocksmith = Mocksmith::run(&[
         &format!("--output-dir={}", output_dir.path().to_string_lossy()),
-        header1.path().to_string_lossy().as_ref(),
-        header2.path().to_string_lossy().as_ref(),
+        source_file1.path().to_string_lossy().as_ref(),
+        source_file2.path().to_string_lossy().as_ref(),
     ]);
     assert!(mocksmith.wait().success());
 
@@ -175,13 +175,13 @@ fn multiple_files_produce_multiple_headers_when_output_to_dir() {
     assert_matches!(
         &mock1,
         &header_pattern(
-            &[header1.path()],
+            &[source_file1.path()],
             &[some_mock("ISomething", "MockSomething"),]
         )
     );
     assert_matches!(
         &mock2,
-        &header_pattern(&[header2.path()], &[some_mock("IOther", "MockOther"),])
+        &header_pattern(&[source_file2.path()], &[some_mock("IOther", "MockOther"),])
     );
 }
 
@@ -198,24 +198,24 @@ fn mocks_can_be_named_with_sed_style_regex() {
 
 #[test]
 fn files_can_be_named_with_sed_style_regex() {
-    let header = temp_file_from(&some_class("ISomething"));
+    let source_file = temp_file_from(&some_class("ISomething"));
     let output_dir = temp_dir();
 
     let mut mocksmith = Mocksmith::run(&[
         &format!("--output-dir={}", output_dir.path().to_string_lossy()),
         r"--name-output-file=s/(.*)/mocks_from_\1/",
-        header.path().to_string_lossy().as_ref(),
+        source_file.path().to_string_lossy().as_ref(),
     ]);
     assert!(mocksmith.wait().success());
     let mock = std::fs::read_to_string(output_dir.path().join(format!(
         "mocks_from_{}",
-        header.path().file_name().unwrap().to_string_lossy()
+        source_file.path().file_name().unwrap().to_string_lossy()
     )))
     .expect("Mock file not found");
     assert_matches!(
         mock,
         &header_pattern(
-            &[header.path()],
+            &[source_file.path()],
             &[some_mock("ISomething", "MockSomething")]
         )
     );

@@ -35,13 +35,13 @@ fn input_from_stdin_doesnt_work_when_output_to_file_or_dir() {
 
 #[test]
 fn files_cant_be_named_with_sed_style_regex_when_output_to_file() {
-    let header = temp_file_from(&some_class("ISomething"));
+    let source_file = temp_file_from(&some_class("ISomething"));
     let output = temp_file();
 
     let mut mocksmith = Mocksmith::run(&[
         &format!("--output-file={}", output.path().to_string_lossy()),
         r"--name-output-file=s/(.*)/mocks_from_\1/",
-        header.path().to_string_lossy().as_ref(),
+        source_file.path().to_string_lossy().as_ref(),
     ]);
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains("--output-dir is required"));
