@@ -47,3 +47,39 @@ fn files_cant_be_named_with_sed_style_regex_when_output_to_file() {
     assert!(stderr.contains("--output-dir is required"));
     assert!(!mocksmith.wait().success());
 }
+
+#[test]
+fn cant_specify_both_output_file_and_dir() {
+    let source_file = temp_file_from(&some_class("ISomething"));
+    let output = temp_file();
+    let output_dir = temp_dir();
+
+    let mut mocksmith = Mocksmith::run(&[
+        &format!("--output-file={}", output.path().to_string_lossy()),
+        &format!("--output-dir={}", output_dir.path().to_string_lossy()),
+        source_file.path().to_string_lossy().as_ref(),
+    ]);
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(
+        stderr.contains(
+            "'--output-file <OUTPUT_FILE>' cannot be used with '--output-dir <OUTPUT_DIR>'"
+        )
+    );
+    assert!(!mocksmith.wait().success());
+}
+
+#[test]
+fn cant_specify_nonexisting_dir() {
+    let source_file = temp_file_from(&some_class("ISomething"));
+
+    let mut mocksmith = Mocksmith::run(&[
+        "--output-dir=path_to_a_directory_that_does_not_exist",
+        source_file.path().to_string_lossy().as_ref(),
+    ]);
+    let stderr = mocksmith.read_stderr().unwrap();
+    println!("stderr: {stderr}");
+    assert!(stderr.contains(
+        "Failed to write mock header file path_to_a_directory_that_does_not_exist" //...
+    ));
+    assert!(!mocksmith.wait().success());
+}
