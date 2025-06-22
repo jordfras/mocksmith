@@ -27,6 +27,8 @@ impl Drop for Mocksmith {
     }
 }
 
+// Not all methods are used in all integration test files
+#[allow(dead_code)]
 impl Mocksmith {
     /// Runs mocksmith with the provided arguments
     pub fn run(args: &[&str]) -> Self {
