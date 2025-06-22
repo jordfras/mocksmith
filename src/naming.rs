@@ -1,3 +1,5 @@
+use crate::MockHeader;
+
 /// Default function to generate mock names.
 ///
 /// This function generates a mock name by stripping common prefixes or suffixes like
@@ -19,6 +21,39 @@ pub fn default_name_mock(class_name: &str) -> String {
     } else {
         format!("Mock{}", class_name)
     }
+}
+
+/// Default function to generate output file names for mocks.
+pub fn default_name_output_file(header: &MockHeader) -> String {
+    // Use same file extension as the first header of the mocked classes, if available
+    let extension = header
+        .source_files
+        .first()
+        .map(|ph| ph.extension().unwrap_or(std::ffi::OsStr::new("h")))
+        .unwrap_or(std::ffi::OsStr::new("h"));
+
+    // If there is a single mock in the output, name the header the same as the mock
+    if header.names.len() == 1 {
+        let mut file_name = std::convert::Into::<std::ffi::OsString>::into(&header.names[0]);
+        file_name.push(".");
+        file_name.push(extension);
+        return file_name.to_string_lossy().to_string();
+    }
+
+    // Otherwise use the same name of the single source file, with a "_mocks" suffix to
+    // the stem
+    if header.source_files.len() == 1 {
+        if let Some(stem) = header.source_files[0].file_stem() {
+            let mut file_name = stem.to_os_string();
+            file_name.push("_mocks");
+            file_name.push(".");
+            file_name.push(extension);
+            return file_name.to_string_lossy().to_string();
+        }
+    }
+
+    // If there is no source file, fallback to "mocks.h"
+    String::from("mocks.h")
 }
 
 /// Helper struct to name mocks based on sed style regex replacement.
@@ -57,16 +92,16 @@ impl SedReplacement {
     /// Generates a mock name based on the provided class name using the regex and name
     /// pattern. If the regex does not match, it defaults to prefixing "Mock" to the
     /// class name.
-    pub fn mock_name(&self, class_name: &str) -> String {
+    pub fn name(&self, class_name: &str) -> String {
         let Some(captures) = self.regex.captures(class_name) else {
             return format!("Mock{}", class_name);
         };
 
-        let mut mock_name = self.name_pattern.clone();
+        let mut name = self.name_pattern.clone();
         for i in 1..captures.len() {
-            mock_name = mock_name.replace(&format!("\\{i}"), captures.get(i).unwrap().as_str());
+            name = name.replace(&format!("\\{i}"), captures.get(i).unwrap().as_str());
         }
-        mock_name
+        name
     }
 }
 
@@ -88,16 +123,64 @@ mod tests {
     }
 
     #[test]
+    fn default_name_output_file_uses_mock_name_when_only_one_mock() {
+        let info = MockHeader {
+            source_files: vec![std::path::PathBuf::from("source.h")],
+            parent_names: vec!["ISomething".to_string()],
+            names: vec!["MockSomething".to_string()],
+            code: String::new(),
+        };
+
+        assert_eq!(default_name_output_file(&info), "MockSomething.h");
+    }
+
+    #[test]
+    fn default_name_output_file_uses_extension_from_source_file() {
+        let info = MockHeader {
+            source_files: vec![std::path::PathBuf::from("source.hpp")],
+            parent_names: vec!["ISomething".to_string()],
+            names: vec!["MockSomething".to_string()],
+            code: String::new(),
+        };
+
+        assert_eq!(default_name_output_file(&info), "MockSomething.hpp");
+    }
+
+    #[test]
+    fn default_name_output_file_uses_source_file_with_suffix_when_several_mocks() {
+        let info = MockHeader {
+            source_files: vec![std::path::PathBuf::from("source.hpp")],
+            parent_names: vec!["ISomething".to_string(), "IOther".to_string()],
+            names: vec!["MockSomething".to_string(), "MockOther".to_string()],
+            code: String::new(),
+        };
+
+        assert_eq!(default_name_output_file(&info), "source_mocks.hpp");
+    }
+
+    #[test]
+    fn default_name_output_file_falls_back_to_mocks_h() {
+        let info = MockHeader {
+            source_files: Vec::new(),
+            parent_names: vec!["ISomething".to_string(), "IOther".to_string()],
+            names: vec!["MockSomething".to_string(), "MockOther".to_string()],
+            code: String::new(),
+        };
+
+        assert_eq!(default_name_output_file(&info), "mocks.h");
+    }
+
+    #[test]
     fn sed_namer_replaces_matches() {
         let namer = SedReplacement::from_sed_replacement(r"s/Ifc(.*)/Mock\1/").unwrap();
-        assert_eq!(namer.mock_name("IfcMyType"), "MockMyType");
+        assert_eq!(namer.name("IfcMyType"), "MockMyType");
     }
 
     #[test]
     fn sed_namer_defaults_to_prefix() {
         let namer = SedReplacement::from_sed_replacement(r"s/Ifc(.*)/Mock\1/").unwrap();
-        assert_eq!(namer.mock_name("IMyType"), "MockIMyType");
-        assert_eq!(namer.mock_name("MyIfcType"), "MockMyIfcType");
+        assert_eq!(namer.name("IMyType"), "MockIMyType");
+        assert_eq!(namer.name("MyIfcType"), "MockMyIfcType");
     }
 
     #[test]

@@ -27,6 +27,8 @@ impl Drop for Mocksmith {
     }
 }
 
+// Not all methods are used in all integration test files
+#[allow(dead_code)]
 impl Mocksmith {
     /// Runs mocksmith with the provided arguments
     pub fn run(args: &[&str]) -> Self {
@@ -63,23 +65,31 @@ impl Mocksmith {
         self.stdin = None;
     }
 
+    pub fn read_stdout(&mut self) -> Result<String, std::io::Error> {
+        Self::read(&mut self.stdout, "stdout")
+    }
+
+    pub fn read_stderr(&mut self) -> Result<String, std::io::Error> {
+        Self::read(&mut self.stderr, "stderr")
+    }
+
     /// Reads some text from the program's stdout and checks that it matches the expected text,
     /// otherwise it returns an error
-    pub fn read_stdout(&mut self, expected_text: &str) -> Result<(), std::io::Error> {
-        let read_text = Self::read(&mut self.stdout, "stdout")?;
+    pub fn expect_stdout(&mut self, expected_text: &str) -> Result<(), std::io::Error> {
+        let read_text = self.read_stdout()?;
         if read_text == expected_text {
             Ok(())
         } else {
             Err(std::io::Error::other(format!(
-                "Expected to read '{expected_text}' from stdout but read '{read_text}'"
+                "Expected to read:\n'{expected_text}'\nfrom stdout but read:\n'{read_text}'"
             )))
         }
     }
 
     /// Reads some text from the program's stderr and checks that it matches the expected text,
     /// otherwise it returns an error
-    pub fn _read_stderr(&mut self, expected_text: &str) -> Result<(), std::io::Error> {
-        let read_text = Self::read(&mut self.stderr, "stderr")?;
+    pub fn _expect_stderr(&mut self, expected_text: &str) -> Result<(), std::io::Error> {
+        let read_text = self.read_stderr()?;
         if read_text == expected_text {
             Ok(())
         } else {
