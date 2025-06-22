@@ -185,6 +185,23 @@ fn multiple_files_produce_multiple_headers_when_output_to_dir() {
     );
 }
 
+#[test]
+fn no_files_are_written_to_dir_if_failing_to_mock_one_source_file() {
+    let source_file1 = temp_file_from(&some_class("ISomething"));
+    let source_file2 = temp_file_from("class InvalidSyntax {{");
+    let output_dir = temp_dir();
+
+    let mut mocksmith = Mocksmith::run(&[
+        &format!("--output-dir={}", output_dir.path().to_string_lossy()),
+        source_file1.path().to_string_lossy().as_ref(),
+        source_file2.path().to_string_lossy().as_ref(),
+    ]);
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("Parse error"));
+    assert!(!mocksmith.wait().success());
+
+    assert_eq!(output_dir.path().read_dir().unwrap().count(), 0);
+}
 
 #[test]
 fn mocks_can_be_named_with_sed_style_regex() {

@@ -126,7 +126,6 @@ fn main() -> anyhow::Result<()> {
             arguments.always_write,
         )?;
     } else if arguments.output_dir.is_some() {
-        // TODO: Test what happens if we have multiple headers and one fails
         let headers = arguments
             .source_file
             .iter()
