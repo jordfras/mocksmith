@@ -3,6 +3,7 @@
 pub(crate) struct ClassToMock<'a> {
     pub(crate) class: clang::Entity<'a>,
     pub(crate) namespaces: Vec<clang::Entity<'a>>,
+    methods_to_mock: crate::MethodsToMockStrategy,
 }
 
 impl<'a> ClassToMock<'a> {
@@ -11,6 +12,7 @@ impl<'a> ClassToMock<'a> {
             .get_children()
             .iter()
             .filter(|child| child.get_kind() == clang::EntityKind::Method)
+            .filter(|method| self.methods_to_mock.should_mock(method))
             .copied()
             .collect()
     }
@@ -61,6 +63,7 @@ impl<'a> AstTraverser<'a> {
                     let class = ClassToMock {
                         class: entity,
                         namespaces: self.namespace_stack.clone(),
+                        methods_to_mock: self.methods_to_mock,
                     };
                     self.classes.push(class);
                 }
@@ -88,5 +91,15 @@ impl<'a> AstTraverser<'a> {
         class.get_children().iter().any(|child| {
             child.get_kind() == clang::EntityKind::Method && self.methods_to_mock.should_mock(child)
         })
+    }
+}
+
+impl crate::MethodsToMockStrategy {
+    fn should_mock(self, method: &clang::Entity) -> bool {
+        match self {
+            crate::MethodsToMockStrategy::All => !method.is_static_method(),
+            crate::MethodsToMockStrategy::AllVirtual => method.is_virtual_method(),
+            crate::MethodsToMockStrategy::OnlyPureVirtual => method.is_pure_virtual_method(),
+        }
     }
 }
