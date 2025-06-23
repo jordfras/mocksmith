@@ -201,6 +201,13 @@ fn method_qualifiers(method: &clang::Entity) -> Vec<String> {
     if method.is_const_method() {
         qualifiers.push("const".to_string());
     }
+    if let Some(method_type) = method.get_type() {
+        match method_type.get_ref_qualifier() {
+            Some(clang::RefQualifier::LValue) => qualifiers.push("ref(&)".to_string()),
+            Some(clang::RefQualifier::RValue) => qualifiers.push("ref(&&)".to_string()),
+            _ => {}
+        }
+    }
     if let Some(exception_specification) = method.get_exception_specification() {
         if exception_specification == clang::ExceptionSpecification::BasicNoexcept {
             qualifiers.push("noexcept".to_string());

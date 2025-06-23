@@ -90,6 +90,30 @@ fn noexcept_and_const_qualifiers_are_added_when_needed() {
 }
 
 #[test]
+fn ref_qualifiers_are_added_when_needed() {
+    let mocksmith = Mocksmith::new_when_available().unwrap();
+    let cpp_class = "
+          #include <string>
+          class Foo {
+          public:
+            virtual ~Foo() = default;
+            virtual void bar() const & = 0;
+            virtual void fizz() const && = 0;
+          };";
+    assert_mocks!(
+        mocksmith.create_mocks_from_string(cpp_class),
+        lines!(
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, bar, (), (const, ref(&), override));",
+            "  MOCK_METHOD(void, fizz, (), (const, ref(&&), override));",
+            "};"
+        )
+    );
+}
+
+#[test]
 fn types_with_commas_are_wrapped_with_parenthesis() {
     let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
