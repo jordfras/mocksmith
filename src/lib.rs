@@ -40,7 +40,7 @@ pub enum MocksmithError {
 pub type Result<T> = std::result::Result<T, MocksmithError>;
 
 /// Enum to control which methods to mock in a class.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum MethodsToMockStrategy {
     /// Mock all methods, including non-virtual ones.
     All,
@@ -48,16 +48,6 @@ pub enum MethodsToMockStrategy {
     AllVirtual,
     /// Mock only pure virtual methods.
     OnlyPureVirtual,
-}
-
-impl MethodsToMockStrategy {
-    fn should_mock(self, method: &clang::Entity) -> bool {
-        match self {
-            MethodsToMockStrategy::All => !method.is_static_method(),
-            MethodsToMockStrategy::AllVirtual => method.is_virtual_method(),
-            MethodsToMockStrategy::OnlyPureVirtual => method.is_pure_virtual_method(),
-        }
-    }
 }
 
 /// Representation of a mock produced by Mocksmith.

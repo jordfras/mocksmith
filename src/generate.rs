@@ -101,19 +101,15 @@ impl Generator {
         builder.add_line("{");
         builder.add_line("public:");
         builder.push_indent();
-        class
-            .methods()
-            .iter()
-            .filter(|method| self.methods_to_mock.should_mock(method))
-            .for_each(|method| {
-                builder.add_line(&format!(
-                    "MOCK_METHOD({}, {}, ({}), ({}));",
-                    method_return_type(method),
-                    method.get_name().expect("Method should have a name"),
-                    method_arguments(method).join(", "),
-                    method_qualifiers(method).join(", ")
-                ));
-            });
+        class.methods().iter().for_each(|method| {
+            builder.add_line(&format!(
+                "MOCK_METHOD({}, {}, ({}), ({}));",
+                method_return_type(method),
+                method.get_name().expect("Method should have a name"),
+                method_arguments(method).join(", "),
+                method_qualifiers(method).join(", ")
+            ));
+        });
         builder.pop_indent();
         builder.add_line("};");
 
