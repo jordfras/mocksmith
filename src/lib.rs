@@ -254,6 +254,7 @@ impl Mocksmith {
         let tu = index
             .parser(file)
             .arguments(&self.clang_arguments())
+            .skip_function_bodies(true)
             .parse()
             .expect("Failed to parse translation unit");
         self.check_diagnostics(Some(file), &tu)?;
