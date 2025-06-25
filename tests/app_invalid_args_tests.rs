@@ -83,3 +83,11 @@ fn cant_specify_nonexisting_dir() {
     ));
     assert!(!mocksmith.wait().success());
 }
+
+#[test]
+fn cant_allow_deprecated_when_not_generating_header() {
+    let mut mocksmith = Mocksmith::run(&["--msvc-allow-deprecated"]);
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("required arguments were not provided"));
+    assert!(!mocksmith.wait().success());
+}

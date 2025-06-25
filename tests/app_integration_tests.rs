@@ -4,7 +4,9 @@ mod helpers;
 mod paths;
 mod program_under_test;
 
-use helpers::{header_pattern, some_class, some_mock, temp_dir, temp_file, temp_file_from};
+use helpers::{
+    header_pattern, regex_quote, some_class, some_mock, temp_dir, temp_file, temp_file_from,
+};
 use program_under_test::Mocksmith;
 
 #[test]
@@ -267,4 +269,33 @@ fn output_file_is_not_written_if_unchanged_unless_forced() {
     ]);
     assert!(mocksmith.wait().success());
     assert!(first_change < output.as_file().metadata().unwrap().modified().unwrap(),);
+}
+
+#[test]
+fn pragma_added_when_allowing_overriding_deprecated() {
+    let source_file = temp_file_from(&some_class("ISomething"));
+    let output = temp_file();
+
+    let mut mocksmith = Mocksmith::run(&[
+        "--msvc-allow-deprecated",
+        &format!("--output-file={}", output.path().to_string_lossy()),
+        source_file.path().to_string_lossy().as_ref(),
+    ]);
+    assert!(mocksmith.wait().success());
+
+    let header = std::fs::read_to_string(output.path()).expect("Mock file not found");
+    assert_matches!(
+        header,
+        &regex_quote(&lines!(
+            "#ifdef _MSC_VER",
+            "#  pragma warning(push)",
+            "#  pragma warning(disable : 4996)",
+            "#endif",
+            "",
+            &some_mock("ISomething", "MockSomething"),
+            "#ifdef _MSC_VER",
+            "#  pragma warning(pop)",
+            "#endif"
+        ))
+    );
 }
