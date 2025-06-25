@@ -4,7 +4,9 @@ mod helpers;
 mod paths;
 mod program_under_test;
 
-use helpers::{header_pattern, some_class, some_mock, temp_dir, temp_file, temp_file_from};
+use helpers::{
+    header_pattern, regex_quote, some_class, some_mock, temp_dir, temp_file, temp_file_from,
+};
 use program_under_test::Mocksmith;
 
 #[test]
@@ -36,9 +38,9 @@ fn input_from_file_produces_complete_header_when_output_to_file() {
         source_file.path().to_string_lossy().as_ref(),
     ]);
     assert!(mocksmith.wait().success());
-    let mock = std::fs::read_to_string(output.path()).unwrap();
+    let header = std::fs::read_to_string(output.path()).unwrap();
     assert_matches!(
-        mock,
+        header,
         &header_pattern(
             &[source_file.path()],
             &[some_mock("ISomething", "MockSomething")]
@@ -56,10 +58,10 @@ fn input_from_file_produces_complete_header_when_output_to_dir() {
         source_file.path().to_string_lossy().as_ref(),
     ]);
     assert!(mocksmith.wait().success());
-    let mock = std::fs::read_to_string(output_dir.path().join("MockSomething.h"))
+    let header = std::fs::read_to_string(output_dir.path().join("MockSomething.h"))
         .expect("Mock file not found");
     assert_matches!(
-        mock,
+        header,
         &header_pattern(
             &[source_file.path()],
             &[some_mock("ISomething", "MockSomething")]
@@ -83,9 +85,9 @@ fn multiple_classes_in_file_produce_single_header_when_output_to_file() {
     assert!(mocksmith.wait().success());
 
     // Both mocks should be in the file
-    let mocks = std::fs::read_to_string(output.path()).unwrap();
+    let header = std::fs::read_to_string(output.path()).unwrap();
     assert_matches!(
-        &mocks,
+        &header,
         &header_pattern(
             &[source_file.path()],
             &[
@@ -116,9 +118,9 @@ fn multiple_classes_in_file_produce_single_header_when_output_to_dir() {
         "{}_mocks.h",
         source_file.path().file_stem().unwrap().to_string_lossy()
     );
-    let mocks = std::fs::read_to_string(output_dir.path().join(file_name)).unwrap();
+    let header = std::fs::read_to_string(output_dir.path().join(file_name)).unwrap();
     assert_matches!(
-        &mocks,
+        &header,
         &header_pattern(
             &[source_file.path()],
             &[
@@ -143,9 +145,9 @@ fn multiple_files_produce_single_header_when_output_to_file() {
     assert!(mocksmith.wait().success());
 
     // Both mocks should be in the file
-    let mocks = std::fs::read_to_string(output.path()).unwrap();
+    let header = std::fs::read_to_string(output.path()).unwrap();
     assert_matches!(
-        &mocks,
+        &header,
         &header_pattern(
             &[source_file1.path(), source_file2.path()],
             &[
@@ -170,17 +172,17 @@ fn multiple_files_produce_multiple_headers_when_output_to_dir() {
     assert!(mocksmith.wait().success());
 
     // One file per mock
-    let mock1 = std::fs::read_to_string(output_dir.path().join("MockSomething.h")).unwrap();
-    let mock2 = std::fs::read_to_string(output_dir.path().join("MockOther.h")).unwrap();
+    let header1 = std::fs::read_to_string(output_dir.path().join("MockSomething.h")).unwrap();
+    let header2 = std::fs::read_to_string(output_dir.path().join("MockOther.h")).unwrap();
     assert_matches!(
-        &mock1,
+        &header1,
         &header_pattern(
             &[source_file1.path()],
             &[some_mock("ISomething", "MockSomething"),]
         )
     );
     assert_matches!(
-        &mock2,
+        &header2,
         &header_pattern(&[source_file2.path()], &[some_mock("IOther", "MockOther"),])
     );
 }
@@ -224,13 +226,13 @@ fn files_can_be_named_with_sed_style_regex() {
         source_file.path().to_string_lossy().as_ref(),
     ]);
     assert!(mocksmith.wait().success());
-    let mock = std::fs::read_to_string(output_dir.path().join(format!(
+    let header = std::fs::read_to_string(output_dir.path().join(format!(
         "mocks_from_{}",
         source_file.path().file_name().unwrap().to_string_lossy()
     )))
     .expect("Mock file not found");
     assert_matches!(
-        mock,
+        header,
         &header_pattern(
             &[source_file.path()],
             &[some_mock("ISomething", "MockSomething")]
@@ -267,4 +269,33 @@ fn output_file_is_not_written_if_unchanged_unless_forced() {
     ]);
     assert!(mocksmith.wait().success());
     assert!(first_change < output.as_file().metadata().unwrap().modified().unwrap(),);
+}
+
+#[test]
+fn pragma_added_when_allowing_overriding_deprecated() {
+    let source_file = temp_file_from(&some_class("ISomething"));
+    let output = temp_file();
+
+    let mut mocksmith = Mocksmith::run(&[
+        "--msvc-allow-deprecated",
+        &format!("--output-file={}", output.path().to_string_lossy()),
+        source_file.path().to_string_lossy().as_ref(),
+    ]);
+    assert!(mocksmith.wait().success());
+
+    let header = std::fs::read_to_string(output.path()).expect("Mock file not found");
+    assert_matches!(
+        header,
+        &regex_quote(&lines!(
+            "#ifdef _MSC_VER",
+            "#  pragma warning(push)",
+            "#  pragma warning(disable : 4996)",
+            "#endif",
+            "",
+            &some_mock("ISomething", "MockSomething"),
+            "#ifdef _MSC_VER",
+            "#  pragma warning(pop)",
+            "#endif"
+        ))
+    );
 }

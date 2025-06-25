@@ -7,6 +7,7 @@ use crate::model;
 // for a set of classes.
 pub(crate) struct Generator {
     methods_to_mock: MethodsToMockStrategy,
+    add_deprecation_pragma: bool,
     simplified_nested_namespaces: bool,
     indent_str: String,
 }
@@ -37,6 +38,7 @@ impl Generator {
     pub(crate) fn new(methods_to_mock: MethodsToMockStrategy) -> Self {
         Self {
             methods_to_mock,
+            add_deprecation_pragma: false,
             simplified_nested_namespaces: true,
             indent_str: "  ".to_string(),
         }
@@ -44,6 +46,10 @@ impl Generator {
 
     pub(crate) fn methods_to_mock(&mut self, functions: MethodsToMockStrategy) {
         self.methods_to_mock = functions;
+    }
+
+    pub(crate) fn add_deprecation_pragma(&mut self, value: bool) {
+        self.add_deprecation_pragma = value;
     }
 
     pub(crate) fn simplified_nested_namespaces(&mut self, value: bool) {
@@ -70,15 +76,33 @@ impl Generator {
             builder.add_line(&format!("#include \"{path}\""));
         }
         builder.add_line("#include <gmock/gmock.h>");
-        builder.add_line("");
+
+        if self.add_deprecation_pragma {
+            builder.add_line("");
+            builder.add_line("#ifdef _MSC_VER");
+            builder.add_line(&format!("#{}pragma warning(push)", self.indent_str));
+            builder.add_line(&format!(
+                "#{}pragma warning(disable : 4996)",
+                self.indent_str
+            ));
+            builder.add_line("#endif");
+        }
 
         let mut header = crate::MockHeader::new();
         for (class, mock_name) in classes.iter().zip(mock_names) {
-            self.build_mock(&mut builder, class, mock_name);
             builder.add_line("");
+            self.build_mock(&mut builder, class, mock_name);
             header.parent_names.push(class.name());
             header.names.push(mock_name.clone());
         }
+
+        if self.add_deprecation_pragma {
+            builder.add_line("");
+            builder.add_line("#ifdef _MSC_VER");
+            builder.add_line(&format!("#{}pragma warning(pop)", self.indent_str));
+            builder.add_line("#endif");
+        }
+
         header.code = builder.build();
         header
     }

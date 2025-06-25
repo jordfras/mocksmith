@@ -77,9 +77,16 @@ fn cant_specify_nonexisting_dir() {
         source_file.path().to_string_lossy().as_ref(),
     ]);
     let stderr = mocksmith.read_stderr().unwrap();
-    println!("stderr: {stderr}");
     assert!(stderr.contains(
         "Failed to write mock header file path_to_a_directory_that_does_not_exist" //...
     ));
+    assert!(!mocksmith.wait().success());
+}
+
+#[test]
+fn cant_allow_deprecated_when_not_generating_header() {
+    let mut mocksmith = Mocksmith::run(&["--msvc-allow-deprecated"]);
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("required arguments were not provided"));
     assert!(!mocksmith.wait().success());
 }

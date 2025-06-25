@@ -52,6 +52,15 @@ pub fn some_mock(class_name: &str, mock_name: &str) -> String {
     )
 }
 
+// Quotes characters in a text to use as a regex
+pub fn regex_quote(text: &str) -> String {
+    text.trim()
+        .replace("{", "\\{")
+        .replace("}", "\\}")
+        .replace("(", "\\(")
+        .replace(")", "\\)")
+}
+
 // Creates a regex pattern for a header with some mocks
 pub fn header_pattern(source_path: &[&std::path::Path], mocks: &[String]) -> String {
     let source_includes = source_path
@@ -66,13 +75,7 @@ pub fn header_pattern(source_path: &[&std::path::Path], mocks: &[String]) -> Str
         .join("\n");
     let mocks_regex = mocks
         .iter()
-        .map(|mock| {
-            // Quote characters for regex
-            mock.replace("{", "\\{")
-                .replace("}", "\\}")
-                .replace("(", "\\(")
-                .replace(")", "\\)")
-        })
+        .map(|mock| regex_quote(mock))
         .collect::<Vec<_>>()
         .join("[[:space:]]*");
     lines!(

@@ -154,6 +154,14 @@ impl Mocksmith {
         self
     }
 
+    /// Sets whether to add MSVC pragma to allow overriding methods marked as deprecated.
+    /// If it is not added mocked methods marked as deprecated will cause compilation
+    /// warnings. The pragma is only added when generating headers. Default is false.
+    pub fn msvc_allow_overriding_deprecated_methods(mut self, value: bool) -> Self {
+        self.generator.add_deprecation_pragma(value);
+        self
+    }
+
     /// Controls whether to use C++17 style nested namespace declarations with colon
     /// separation or older style. Default is true.
     pub fn simplified_nested_namespaces(mut self, value: bool) -> Self {
@@ -254,6 +262,7 @@ impl Mocksmith {
         let tu = index
             .parser(file)
             .arguments(&self.clang_arguments())
+            .skip_function_bodies(true)
             .parse()
             .expect("Failed to parse translation unit");
         self.check_diagnostics(Some(file), &tu)?;

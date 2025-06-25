@@ -44,6 +44,11 @@ struct Arguments {
     #[arg(short = 'w', long)]
     always_write: bool,
 
+    /// Adds MSVC compiler pragmas to disable warning for overriding deprecated methods.
+    /// Option can only be used when producing header files.
+    #[arg(long, requires = "output")]
+    msvc_allow_deprecated: bool,
+
     /// Paths to the header files to mock. If no header files are provided, the
     /// program reads from stdin and generates mocks for the content.
     #[arg(value_name = "HEADER")]
@@ -79,7 +84,8 @@ fn main() -> anyhow::Result<()> {
 
     let mut mocksmith = Mocksmith::new()
         .context("Could not create Mocksmith instance")?
-        .include_paths(&arguments.include_dir);
+        .include_paths(&arguments.include_dir)
+        .msvc_allow_overriding_deprecated_methods(arguments.msvc_allow_deprecated);
     if let Some(name_sed_replacement) = &arguments.name_mock_sed_replacement {
         let namer = naming::SedReplacement::from_sed_replacement(name_sed_replacement)?;
         mocksmith = mocksmith.mock_name_fun(move |class_name| namer.name(class_name));
