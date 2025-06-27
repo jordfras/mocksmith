@@ -1,5 +1,6 @@
 mod generate;
 mod headerpath;
+mod log;
 mod model;
 pub mod naming;
 
@@ -82,6 +83,7 @@ static CLANG_MUTEX: Mutex<()> = Mutex::new(());
 
 /// Mocksmith is a struct for generating Google Mock mocks for C++ classes.
 pub struct Mocksmith {
+    log: Option<log::Logger>,
     _clang_lock: MutexGuard<'static, ()>,
     clang: clang::Clang,
     generator: generate::Generator,
@@ -96,12 +98,14 @@ impl Mocksmith {
     ///
     /// The function fails if another thread already holds an instance, since Clang can
     /// only be used from one thread.
-    pub fn new() -> Result<Self> {
+    pub fn new(verbose_write: Option<Box<dyn std::io::Write + Send + Sync>>) -> Result<Self> {
+        let log = verbose_write.map(|write| log::Logger::new(write));
+
         let clang_lock = CLANG_MUTEX.try_lock().map_err(|error| match error {
             TryLockError::WouldBlock => MocksmithError::Busy,
             TryLockError::Poisoned(_) => MocksmithError::Poisoned,
         })?;
-        Self::create(clang_lock)
+        Self::create(log, clang_lock)
     }
 
     /// Creates a new Mocksmith instance.
@@ -114,12 +118,13 @@ impl Mocksmith {
             CLANG_MUTEX.clear_poison();
             return Self::new_when_available();
         };
-        Self::create(clang_lock)
+        Self::create(None, clang_lock)
     }
 
-    fn create(clang_lock: MutexGuard<'static, ()>) -> Result<Self> {
+    fn create(log: Option<log::Logger>, clang_lock: MutexGuard<'static, ()>) -> Result<Self> {
         let methods_to_mock = MethodsToMockStrategy::AllVirtual;
         Ok(Self {
+            log,
             _clang_lock: clang_lock,
             clang: clang::Clang::new().map_err(MocksmithError::ClangError)?,
             generator: generate::Generator::new(methods_to_mock),
@@ -332,10 +337,10 @@ mod tests {
 
     #[test]
     fn test_new_with_threads() {
-        let mocksmith = Mocksmith::new().unwrap();
+        let mocksmith = Mocksmith::new(None).unwrap();
 
         let handle = std::thread::spawn(|| {
-            assert!(matches!(Mocksmith::new(), Err(MocksmithError::Busy)));
+            assert!(matches!(Mocksmith::new(None), Err(MocksmithError::Busy)));
         });
         handle.join().unwrap();
 
