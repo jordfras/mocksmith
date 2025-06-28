@@ -25,3 +25,34 @@ impl Logger {
         writeln!(write, "{}", message).unwrap_or_else(|_| eprintln!("{}", message));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn macro_doesnt_evaluate_args_if_disabled() {
+        let mut calls = 0;
+        let mut fun = || {
+            calls += 1;
+            "hello"
+        };
+
+        verbose!(Option::<Logger>::None, "{}", fun());
+        assert_eq!(calls, 0);
+    }
+
+    #[test]
+    fn macro_evalutes_args_when_enabled() {
+        let mut calls = 0;
+        let mut fun = || {
+            calls += 1;
+            "hello"
+        };
+
+        let write = Box::new(Vec::<u8>::new());
+        let log = Some(Logger::new(write));
+        verbose!(log, "{}", fun());
+        assert_eq!(calls, 1);
+    }
+}
