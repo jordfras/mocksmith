@@ -4,6 +4,7 @@ pub mod log;
 mod model;
 pub mod naming;
 
+use capitalize::Capitalize;
 use headerpath::header_include_path;
 use std::{
     path::{Path, PathBuf},
@@ -122,6 +123,7 @@ impl Mocksmith {
     }
 
     fn create(log: Option<log::Logger>, clang_lock: MutexGuard<'static, ()>) -> Result<Self> {
+        verbose!(log, "{}", clang::get_version().capitalize());
         let methods_to_mock = MethodsToMockStrategy::AllVirtual;
         Ok(Self {
             log,
@@ -292,9 +294,12 @@ impl Mocksmith {
     }
 
     fn check_diagnostics(&self, file: Option<&Path>, tu: &clang::TranslationUnit) -> Result<()> {
+        let diagnostics = tu.get_diagnostics();
+        diagnostics
+            .iter()
+            .for_each(|diagnostic| verbose!(&self.log, "{}", diagnostic));
         // Return error with the first diagnostic error found
-        if let Some(diagnostic) = tu
-            .get_diagnostics()
+        if let Some(diagnostic) = diagnostics
             .iter()
             .filter(|diagnostic| diagnostic.get_severity() >= clang::diagnostic::Severity::Error)
             .nth(0)
