@@ -89,6 +89,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "capitalize"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b5271031022835ee8c7582fe67403bd6cb3d962095787af7921027234bab5bf"
+
+[[package]]
 name = "cargo-platform"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -446,6 +452,7 @@ name = "mocksmith"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "capitalize",
  "cargo_metadata",
  "clang",
  "clap",
