@@ -49,6 +49,12 @@ struct Arguments {
     #[arg(long, requires = "output")]
     msvc_allow_deprecated: bool,
 
+    /// Ignores errors from parsing the C++ code. This may lead to unknown types in
+    /// arguments being referred to as `int` and entire functions and classes being
+    /// ignored (when return value of function is unknown)
+    #[arg(long)]
+    ignore_errors: bool,
+
     /// Enables verbose output, printing debug information to stdout if writing mocks to
     /// file, otherwise to stderr.
     #[arg(short = 'v', long)]
