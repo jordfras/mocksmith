@@ -91,6 +91,7 @@ pub struct Mocksmith {
 
     include_paths: Vec<PathBuf>,
     methods_to_mock: MethodsToMockStrategy,
+    ignore_errors: bool,
     name_mock: Box<dyn Fn(&str) -> String>,
 }
 
@@ -134,6 +135,7 @@ impl Mocksmith {
             generator: generate::Generator::new(methods_to_mock),
             include_paths: Vec::new(),
             methods_to_mock,
+            ignore_errors: false,
             name_mock: Box::new(naming::default_name_mock),
         })
     }
@@ -160,6 +162,16 @@ impl Mocksmith {
     pub fn methods_to_mock(mut self, functions: MethodsToMockStrategy) -> Self {
         self.methods_to_mock = functions;
         self.generator.methods_to_mock(functions);
+        self
+    }
+
+    /// Errors detected by Clang during parsing normally causes mock generation to fail.
+    /// Setting this option disables which may be useful, e.g., when not able to provide
+    /// all the include paths. Beware that this may lead to unknown types in arguments
+    /// being referred to as `int` in generated mocks, and entire functions and classes
+    /// being ignored (when return value of function is unknown).
+    pub fn ignore_errors(mut self, value: bool) -> Self {
+        self.ignore_errors = value;
         self
     }
 
@@ -300,19 +312,24 @@ impl Mocksmith {
         diagnostics
             .iter()
             .for_each(|diagnostic| verbose!(&self.log, "{}", diagnostic));
-        // Return error with the first diagnostic error found
-        if let Some(diagnostic) = diagnostics
-            .iter()
-            .filter(|diagnostic| diagnostic.get_severity() >= clang::diagnostic::Severity::Error)
-            .nth(0)
-        {
-            let location = diagnostic.get_location().get_file_location();
-            return Err(MocksmithError::ParseError {
-                message: diagnostic.get_text(),
-                file: file.map(|f| f.to_path_buf()),
-                line: location.line,
-                column: location.column,
-            });
+
+        if !self.ignore_errors {
+            // Return error with the first diagnostic error found
+            if let Some(diagnostic) = diagnostics
+                .iter()
+                .filter(|diagnostic| {
+                    diagnostic.get_severity() >= clang::diagnostic::Severity::Error
+                })
+                .nth(0)
+            {
+                let location = diagnostic.get_location().get_file_location();
+                return Err(MocksmithError::ParseError {
+                    message: diagnostic.get_text(),
+                    file: file.map(|f| f.to_path_buf()),
+                    line: location.line,
+                    column: location.column,
+                });
+            }
         }
         Ok(())
     }

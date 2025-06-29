@@ -49,6 +49,12 @@ struct Arguments {
     #[arg(long, requires = "output")]
     msvc_allow_deprecated: bool,
 
+    /// Ignores errors from parsing the C++ code. This may lead to unknown types in
+    /// arguments being referred to as `int` and entire functions and classes being
+    /// ignored (when return value of function is unknown)
+    #[arg(long)]
+    ignore_errors: bool,
+
     /// Enables verbose output, printing debug information to stdout if writing mocks to
     /// file, otherwise to stderr.
     #[arg(short = 'v', long)]
@@ -102,6 +108,7 @@ fn main() -> anyhow::Result<()> {
     let mut mocksmith = Mocksmith::new(verbose_write)
         .context("Could not create Mocksmith instance")?
         .include_paths(&arguments.include_dir)
+        .ignore_errors(arguments.ignore_errors)
         .msvc_allow_overriding_deprecated_methods(arguments.msvc_allow_deprecated);
     if let Some(name_sed_replacement) = &arguments.name_mock_sed_replacement {
         let namer = naming::SedReplacement::from_sed_replacement(name_sed_replacement)?;
