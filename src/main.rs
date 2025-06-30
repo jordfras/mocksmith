@@ -93,19 +93,13 @@ fn arguments() -> Arguments {
 fn main() -> anyhow::Result<()> {
     let arguments = arguments();
 
-    let verbose_write = if arguments.verbose {
-        Some(
-            if arguments.output_dir.is_some() || arguments.output_file.is_some() {
-                Box::new(std::io::stdout()) as Box<dyn std::io::Write + Send + Sync>
-            } else {
-                Box::new(std::io::stderr()) as Box<dyn std::io::Write + Send + Sync>
-            },
-        )
+    let log_write = if arguments.output_dir.is_some() || arguments.output_file.is_some() {
+        Box::new(std::io::stdout()) as Box<dyn std::io::Write + Send + Sync>
     } else {
-        None
+        Box::new(std::io::stderr()) as Box<dyn std::io::Write + Send + Sync>
     };
 
-    let mut mocksmith = Mocksmith::new(verbose_write)
+    let mut mocksmith = Mocksmith::new(Some(log_write), arguments.verbose)
         .context("Could not create Mocksmith instance")?
         .include_paths(&arguments.include_dir)
         .ignore_errors(arguments.ignore_errors)

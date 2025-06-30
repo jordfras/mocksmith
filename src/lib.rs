@@ -100,8 +100,8 @@ impl Mocksmith {
     ///
     /// The function fails if another thread already holds an instance, since Clang can
     /// only be used from one thread.
-    pub fn new(verbose_write: Option<Box<dyn std::io::Write + Send + Sync>>) -> Result<Self> {
-        let log = verbose_write.map(|write| log::Logger::new(write));
+    pub fn new(log_write: Option<Box<dyn std::io::Write>>, verbose: bool) -> Result<Self> {
+        let log = log_write.map(|write| log::Logger::new(write, verbose));
 
         let clang_lock = CLANG_MUTEX.try_lock().map_err(|error| match error {
             TryLockError::WouldBlock => MocksmithError::Busy,
@@ -309,9 +309,18 @@ impl Mocksmith {
 
     fn check_diagnostics(&self, file: Option<&Path>, tu: &clang::TranslationUnit) -> Result<()> {
         let diagnostics = tu.get_diagnostics();
-        diagnostics
-            .iter()
-            .for_each(|diagnostic| verbose!(&self.log, "{}", diagnostic));
+        if self.ignore_errors {
+            diagnostics
+                .iter()
+                .filter(|diagnostic| {
+                    diagnostic.get_severity() >= clang::diagnostic::Severity::Error
+                })
+                .for_each(|diagnostic| log!(&self.log, "{}", diagnostic));
+        } else {
+            diagnostics
+                .iter()
+                .for_each(|diagnostic| verbose!(&self.log, "{}", diagnostic));
+        }
 
         if !self.ignore_errors {
             // Return error with the first diagnostic error found
@@ -361,10 +370,13 @@ mod tests {
 
     #[test]
     fn test_new_with_threads() {
-        let mocksmith = Mocksmith::new(None).unwrap();
+        let mocksmith = Mocksmith::new(None, false).unwrap();
 
         let handle = std::thread::spawn(|| {
-            assert!(matches!(Mocksmith::new(None), Err(MocksmithError::Busy)));
+            assert!(matches!(
+                Mocksmith::new(None, false),
+                Err(MocksmithError::Busy)
+            ));
         });
         handle.join().unwrap();
 
