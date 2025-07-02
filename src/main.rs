@@ -57,8 +57,12 @@ struct Arguments {
 
     /// Enables verbose output, printing debug information to stdout if writing mocks to
     /// file, otherwise to stderr.
-    #[arg(short = 'v', long)]
+    #[arg(short = 'v', long, group = "logging")]
     verbose: bool,
+
+    /// Disables all log output, other than printing of reason for failure.
+    #[arg(short = 's', long, group = "logging")]
+    silent: bool,
 
     /// Paths to the header files to mock. If no header files are provided, the
     /// program reads from stdin and generates mocks for the content.
@@ -93,13 +97,15 @@ fn arguments() -> Arguments {
 fn main() -> anyhow::Result<()> {
     let arguments = arguments();
 
-    let log_write = if arguments.output_dir.is_some() || arguments.output_file.is_some() {
-        Box::new(std::io::stdout()) as Box<dyn std::io::Write + Send + Sync>
+    let log_write = if arguments.silent {
+        None
+    } else if arguments.output_dir.is_some() || arguments.output_file.is_some() {
+        Some(Box::new(std::io::stdout()) as Box<dyn std::io::Write>)
     } else {
-        Box::new(std::io::stderr()) as Box<dyn std::io::Write + Send + Sync>
+        Some(Box::new(std::io::stderr()) as Box<dyn std::io::Write>)
     };
 
-    let mut mocksmith = Mocksmith::new(Some(log_write), arguments.verbose)
+    let mut mocksmith = Mocksmith::new(log_write, arguments.verbose)
         .context("Could not create Mocksmith instance")?
         .include_paths(&arguments.include_dir)
         .ignore_errors(arguments.ignore_errors)

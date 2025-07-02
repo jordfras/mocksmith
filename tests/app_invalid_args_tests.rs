@@ -90,3 +90,11 @@ fn cant_allow_deprecated_when_not_generating_header() {
     assert!(stderr.contains("required arguments were not provided"));
     assert!(!mocksmith.wait().success());
 }
+
+#[test]
+fn cant_be_verbose_when_silent() {
+    let mut mocksmith = Mocksmith::run(&["--verbose", "--silent"]);
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("'--verbose' cannot be used with '--silent'"));
+    assert!(!mocksmith.wait().success());
+}
