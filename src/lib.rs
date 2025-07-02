@@ -90,8 +90,9 @@ pub struct Mocksmith {
     generator: generate::Generator,
 
     include_paths: Vec<PathBuf>,
-    methods_to_mock: MethodsToMockStrategy,
     ignore_errors: bool,
+    parse_function_bodies: bool,
+    methods_to_mock: MethodsToMockStrategy,
     name_mock: Box<dyn Fn(&str) -> String>,
 }
 
@@ -134,8 +135,9 @@ impl Mocksmith {
             clang,
             generator: generate::Generator::new(methods_to_mock),
             include_paths: Vec::new(),
-            methods_to_mock,
             ignore_errors: false,
+            parse_function_bodies: false,
+            methods_to_mock,
             name_mock: Box::new(naming::default_name_mock),
         })
     }
@@ -172,6 +174,12 @@ impl Mocksmith {
     /// being ignored (when return value of function is unknown).
     pub fn ignore_errors(mut self, value: bool) -> Self {
         self.ignore_errors = value;
+        self
+    }
+
+    /// For easy testability of parser warnings.
+    pub fn parse_function_bodies(mut self, value: bool) -> Self {
+        self.parse_function_bodies = value;
         self
     }
 
@@ -283,7 +291,7 @@ impl Mocksmith {
         let tu = index
             .parser(file)
             .arguments(&self.clang_arguments())
-            .skip_function_bodies(true)
+            .skip_function_bodies(!self.parse_function_bodies)
             .parse()
             .expect("Failed to parse translation unit");
         self.check_diagnostics(Some(file), &tu)?;
@@ -301,6 +309,7 @@ impl Mocksmith {
             .parser("nofile.h")
             .unsaved(&[unsaved])
             .arguments(&self.clang_arguments())
+            .skip_function_bodies(!self.parse_function_bodies)
             .parse()
             .expect("Failed to parse translation unit");
         self.check_diagnostics(None, &tu)?;
