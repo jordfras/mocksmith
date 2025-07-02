@@ -11,23 +11,23 @@ use program_under_test::Mocksmith;
 #[test]
 fn input_from_stdin_doesnt_work_when_output_to_file_or_dir() {
     let output = temp_file();
-    let mut mocksmith = Mocksmith::run(&[&format!(
+    let mut mocksmith = Mocksmith::new_with_options(&[&format!(
         "--output-file={}",
         output.path().to_string_lossy()
-    )]);
-    mocksmith.write_stdin(&some_class("ISomething"));
-    mocksmith.close_stdin();
+    )])
+    .run()
+    .stdin(&some_class("ISomething"));
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains("required arguments were not provided"));
     assert!(!mocksmith.wait().success());
 
     let output_dir = temp_dir();
-    let mut mocksmith = Mocksmith::run(&[&format!(
+    let mut mocksmith = Mocksmith::new_with_options(&[&format!(
         "--output-dir={}",
         output_dir.path().to_string_lossy()
-    )]);
-    mocksmith.write_stdin(&some_class("ISomething"));
-    mocksmith.close_stdin();
+    )])
+    .run()
+    .stdin(&some_class("ISomething"));
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains("required arguments were not provided"));
     assert!(!mocksmith.wait().success());
@@ -38,11 +38,12 @@ fn files_cant_be_named_with_sed_style_regex_when_output_to_file() {
     let source_file = temp_file_from(&some_class("ISomething"));
     let output = temp_file();
 
-    let mut mocksmith = Mocksmith::run(&[
+    let mut mocksmith = Mocksmith::new_with_options(&[
         &format!("--output-file={}", output.path().to_string_lossy()),
         r"--name-output-file=s/(.*)/mocks_from_\1/",
-        source_file.path().to_string_lossy().as_ref(),
-    ]);
+    ])
+    .source_file(source_file.path())
+    .run();
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains("--output-dir is required"));
     assert!(!mocksmith.wait().success());
@@ -54,11 +55,12 @@ fn cant_specify_both_output_file_and_dir() {
     let output = temp_file();
     let output_dir = temp_dir();
 
-    let mut mocksmith = Mocksmith::run(&[
+    let mut mocksmith = Mocksmith::new_with_options(&[
         &format!("--output-file={}", output.path().to_string_lossy()),
         &format!("--output-dir={}", output_dir.path().to_string_lossy()),
-        source_file.path().to_string_lossy().as_ref(),
-    ]);
+    ])
+    .source_file(source_file.path())
+    .run();
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(
         stderr.contains(
@@ -72,10 +74,10 @@ fn cant_specify_both_output_file_and_dir() {
 fn cant_specify_nonexisting_dir() {
     let source_file = temp_file_from(&some_class("ISomething"));
 
-    let mut mocksmith = Mocksmith::run(&[
-        "--output-dir=path_to_a_directory_that_does_not_exist",
-        source_file.path().to_string_lossy().as_ref(),
-    ]);
+    let mut mocksmith =
+        Mocksmith::new_with_options(&["--output-dir=path_to_a_directory_that_does_not_exist"])
+            .source_file(source_file.path())
+            .run();
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains(
         "Failed to write mock header file path_to_a_directory_that_does_not_exist" //...
@@ -85,7 +87,7 @@ fn cant_specify_nonexisting_dir() {
 
 #[test]
 fn cant_allow_deprecated_when_not_generating_header() {
-    let mut mocksmith = Mocksmith::run(&["--msvc-allow-deprecated"]);
+    let mut mocksmith = Mocksmith::new_with_options(&["--msvc-allow-deprecated"]).run();
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains("required arguments were not provided"));
     assert!(!mocksmith.wait().success());
@@ -93,7 +95,7 @@ fn cant_allow_deprecated_when_not_generating_header() {
 
 #[test]
 fn cant_be_verbose_when_silent() {
-    let mut mocksmith = Mocksmith::run(&["--verbose", "--silent"]);
+    let mut mocksmith = Mocksmith::new_with_options(&["--verbose", "--silent"]).run();
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains("'--verbose' cannot be used with '--silent'"));
     assert!(!mocksmith.wait().success());

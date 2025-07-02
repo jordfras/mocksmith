@@ -11,9 +11,7 @@ use program_under_test::Mocksmith;
 
 #[test]
 fn input_from_stdin_produces_mock_only() {
-    let mut mocksmith = Mocksmith::run(&[]);
-    mocksmith.write_stdin(&some_class("ISomething"));
-    mocksmith.close_stdin();
+    let mut mocksmith = Mocksmith::new().run().stdin(&some_class("ISomething"));
 
     assert_ok!(mocksmith.expect_stdout(&some_mock("ISomething", "MockSomething")));
     assert!(mocksmith.wait().success());
@@ -23,7 +21,7 @@ fn input_from_stdin_produces_mock_only() {
 fn input_from_file_produces_mock_only_when_output_to_stdout() {
     let source_file = temp_file_from(&some_class("ISomething"));
 
-    let mut mocksmith = Mocksmith::run(&[source_file.path().to_string_lossy().as_ref()]);
+    let mut mocksmith = Mocksmith::new().source_file(source_file.path()).run();
     assert_ok!(mocksmith.expect_stdout(&some_mock("ISomething", "MockSomething")));
     assert!(mocksmith.wait().success());
 }
@@ -33,11 +31,16 @@ fn input_from_file_produces_complete_header_when_output_to_file() {
     let source_file = temp_file_from(&some_class("ISomething"));
     let output = temp_file();
 
-    let mut mocksmith = Mocksmith::run(&[
-        &format!("--output-file={}", output.path().to_string_lossy()),
-        source_file.path().to_string_lossy().as_ref(),
-    ]);
-    assert!(mocksmith.wait().success());
+    assert!(
+        Mocksmith::new_with_options(&[&format!(
+            "--output-file={}",
+            output.path().to_string_lossy()
+        )])
+        .source_file(source_file.path())
+        .run()
+        .wait()
+        .success()
+    );
     let header = std::fs::read_to_string(output.path()).unwrap();
     assert_matches!(
         header,
@@ -53,11 +56,16 @@ fn input_from_file_produces_complete_header_when_output_to_dir() {
     let source_file = temp_file_from(&some_class("ISomething"));
     let output_dir = temp_dir();
 
-    let mut mocksmith = Mocksmith::run(&[
-        &format!("--output-dir={}", output_dir.path().to_string_lossy()),
-        source_file.path().to_string_lossy().as_ref(),
-    ]);
-    assert!(mocksmith.wait().success());
+    assert!(
+        Mocksmith::new_with_options(&[&format!(
+            "--output-dir={}",
+            output_dir.path().to_string_lossy()
+        )])
+        .source_file(source_file.path())
+        .run()
+        .wait()
+        .success()
+    );
     let header = std::fs::read_to_string(output_dir.path().join("MockSomething.h"))
         .expect("Mock file not found");
     assert_matches!(
@@ -78,11 +86,16 @@ fn multiple_classes_in_file_produce_single_header_when_output_to_file() {
     ));
     let output = temp_file();
 
-    let mut mocksmith = Mocksmith::run(&[
-        &format!("--output-file={}", output.path().to_string_lossy()),
-        source_file.path().to_string_lossy().as_ref(),
-    ]);
-    assert!(mocksmith.wait().success());
+    assert!(
+        Mocksmith::new_with_options(&[&format!(
+            "--output-file={}",
+            output.path().to_string_lossy()
+        )])
+        .source_file(source_file.path())
+        .run()
+        .wait()
+        .success()
+    );
 
     // Both mocks should be in the file
     let header = std::fs::read_to_string(output.path()).unwrap();
@@ -107,11 +120,16 @@ fn multiple_classes_in_file_produce_single_header_when_output_to_dir() {
     ));
     let output_dir = temp_dir();
 
-    let mut mocksmith = Mocksmith::run(&[
-        &format!("--output-dir={}", output_dir.path().to_string_lossy()),
-        source_file.path().to_string_lossy().as_ref(),
-    ]);
-    assert!(mocksmith.wait().success());
+    assert!(
+        Mocksmith::new_with_options(&[&format!(
+            "--output-dir={}",
+            output_dir.path().to_string_lossy()
+        )])
+        .source_file(source_file.path())
+        .run()
+        .wait()
+        .success()
+    );
 
     // Both mocks should be in the file
     let file_name = format!(
@@ -137,12 +155,17 @@ fn multiple_files_produce_single_header_when_output_to_file() {
     let source_file2 = temp_file_from(&some_class("IOther"));
     let output = temp_file();
 
-    let mut mocksmith = Mocksmith::run(&[
-        &format!("--output-file={}", output.path().to_string_lossy()),
-        source_file1.path().to_string_lossy().as_ref(),
-        source_file2.path().to_string_lossy().as_ref(),
-    ]);
-    assert!(mocksmith.wait().success());
+    assert!(
+        Mocksmith::new_with_options(&[&format!(
+            "--output-file={}",
+            output.path().to_string_lossy()
+        )])
+        .source_file(source_file1.path())
+        .source_file(source_file2.path())
+        .run()
+        .wait()
+        .success()
+    );
 
     // Both mocks should be in the file
     let header = std::fs::read_to_string(output.path()).unwrap();
@@ -164,12 +187,17 @@ fn multiple_files_produce_multiple_headers_when_output_to_dir() {
     let source_file2 = temp_file_from(&some_class("IOther"));
     let output_dir = temp_dir();
 
-    let mut mocksmith = Mocksmith::run(&[
-        &format!("--output-dir={}", output_dir.path().to_string_lossy()),
-        source_file1.path().to_string_lossy().as_ref(),
-        source_file2.path().to_string_lossy().as_ref(),
-    ]);
-    assert!(mocksmith.wait().success());
+    assert!(
+        Mocksmith::new_with_options(&[&format!(
+            "--output-dir={}",
+            output_dir.path().to_string_lossy()
+        )])
+        .source_file(source_file1.path())
+        .source_file(source_file2.path())
+        .run()
+        .wait()
+        .success()
+    );
 
     // One file per mock
     let header1 = std::fs::read_to_string(output_dir.path().join("MockSomething.h")).unwrap();
@@ -193,11 +221,13 @@ fn no_files_are_written_to_dir_if_failing_to_mock_one_source_file() {
     let source_file2 = temp_file_from("class InvalidSyntax {{");
     let output_dir = temp_dir();
 
-    let mut mocksmith = Mocksmith::run(&[
-        &format!("--output-dir={}", output_dir.path().to_string_lossy()),
-        source_file1.path().to_string_lossy().as_ref(),
-        source_file2.path().to_string_lossy().as_ref(),
-    ]);
+    let mut mocksmith = Mocksmith::new_with_options(&[&format!(
+        "--output-dir={}",
+        output_dir.path().to_string_lossy()
+    )])
+    .source_file(source_file1.path())
+    .source_file(source_file2.path())
+    .run();
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains("Parse error"));
     assert!(!mocksmith.wait().success());
@@ -207,9 +237,9 @@ fn no_files_are_written_to_dir_if_failing_to_mock_one_source_file() {
 
 #[test]
 fn mocks_can_be_named_with_sed_style_regex() {
-    let mut mocksmith = Mocksmith::run(&[r"--name-mock=s/I(.*)/Fake\1/"]);
-    mocksmith.write_stdin(&some_class("ISomething"));
-    mocksmith.close_stdin();
+    let mut mocksmith = Mocksmith::new_with_options(&[r"--name-mock=s/I(.*)/Fake\1/"])
+        .run()
+        .stdin(&some_class("ISomething"));
 
     assert_ok!(mocksmith.expect_stdout(&some_mock("ISomething", "FakeSomething")));
     assert!(mocksmith.wait().success());
@@ -220,12 +250,16 @@ fn files_can_be_named_with_sed_style_regex() {
     let source_file = temp_file_from(&some_class("ISomething"));
     let output_dir = temp_dir();
 
-    let mut mocksmith = Mocksmith::run(&[
-        &format!("--output-dir={}", output_dir.path().to_string_lossy()),
-        r"--name-output-file=s/(.*)/mocks_from_\1/",
-        source_file.path().to_string_lossy().as_ref(),
-    ]);
-    assert!(mocksmith.wait().success());
+    assert!(
+        Mocksmith::new_with_options(&[
+            &format!("--output-dir={}", output_dir.path().to_string_lossy()),
+            r"--name-output-file=s/(.*)/mocks_from_\1/"
+        ])
+        .source_file(source_file.path())
+        .run()
+        .wait()
+        .success()
+    );
     let header = std::fs::read_to_string(output_dir.path().join(format!(
         "mocks_from_{}",
         source_file.path().file_name().unwrap().to_string_lossy()
@@ -245,29 +279,43 @@ fn output_file_is_not_written_if_unchanged_unless_forced() {
     let source_file = temp_file_from(&some_class("ISomething"));
     let output = temp_file();
 
-    let mut mocksmith = Mocksmith::run(&[
-        &format!("--output-file={}", output.path().to_string_lossy()),
-        source_file.path().to_string_lossy().as_ref(),
-    ]);
-    assert!(mocksmith.wait().success());
+    assert!(
+        Mocksmith::new_with_options(&[&format!(
+            "--output-file={}",
+            output.path().to_string_lossy()
+        )])
+        .source_file(source_file.path())
+        .run()
+        .wait()
+        .success()
+    );
     let first_change = output.as_file().metadata().unwrap().modified().unwrap();
 
-    let mut mocksmith = Mocksmith::run(&[
-        &format!("--output-file={}", output.path().to_string_lossy()),
-        source_file.path().to_string_lossy().as_ref(),
-    ]);
-    assert!(mocksmith.wait().success());
+    assert!(
+        Mocksmith::new_with_options(&[&format!(
+            "--output-file={}",
+            output.path().to_string_lossy()
+        )])
+        .source_file(source_file.path())
+        .run()
+        .wait()
+        .success()
+    );
     assert_eq!(
         first_change,
         output.as_file().metadata().unwrap().modified().unwrap(),
     );
 
-    let mut mocksmith = Mocksmith::run(&[
-        "--always-write",
-        &format!("--output-file={}", output.path().to_string_lossy()),
-        source_file.path().to_string_lossy().as_ref(),
-    ]);
-    assert!(mocksmith.wait().success());
+    assert!(
+        Mocksmith::new_with_options(&[
+            "--always-write",
+            &format!("--output-file={}", output.path().to_string_lossy())
+        ])
+        .source_file(source_file.path())
+        .run()
+        .wait()
+        .success()
+    );
     assert!(first_change < output.as_file().metadata().unwrap().modified().unwrap(),);
 }
 
@@ -276,12 +324,16 @@ fn pragma_added_when_allowing_overriding_deprecated() {
     let source_file = temp_file_from(&some_class("ISomething"));
     let output = temp_file();
 
-    let mut mocksmith = Mocksmith::run(&[
-        "--msvc-allow-deprecated",
-        &format!("--output-file={}", output.path().to_string_lossy()),
-        source_file.path().to_string_lossy().as_ref(),
-    ]);
-    assert!(mocksmith.wait().success());
+    assert!(
+        Mocksmith::new_with_options(&[
+            "--msvc-allow-deprecated",
+            &format!("--output-file={}", output.path().to_string_lossy())
+        ])
+        .source_file(source_file.path())
+        .run()
+        .wait()
+        .success()
+    );
 
     let header = std::fs::read_to_string(output.path()).expect("Mock file not found");
     assert_matches!(
