@@ -16,7 +16,7 @@ impl crate::Mock {
     fn from(parent: &model::ClassToMock, name: &str, builder: builder::CodeBuilder) -> Self {
         Self {
             source_file: None,
-            parent_name: parent.name(),
+            parent_name: parent.name.clone(),
             name: name.to_string(),
             code: builder.build(),
         }
@@ -92,7 +92,7 @@ impl Generator {
         for (class, mock_name) in classes.iter().zip(mock_names) {
             builder.add_line("");
             self.build_mock(&mut builder, class, mock_name);
-            header.parent_names.push(class.name());
+            header.parent_names.push(class.name.clone());
             header.names.push(mock_name.clone());
         }
 
@@ -121,15 +121,15 @@ impl Generator {
     ) {
         builder.maybe_add_line(&self.namespace_start(&class.namespaces));
 
-        builder.add_line(&format!("class {} : public {}", mock_name, class.name()));
+        builder.add_line(&format!("class {} : public {}", mock_name, class.name));
         builder.add_line("{");
         builder.add_line("public:");
         builder.push_indent();
-        class.methods().iter().for_each(|method| {
+        class.methods.iter().for_each(|method| {
             builder.add_line(&format!(
                 "MOCK_METHOD({}, {}, ({}), ({}));",
                 method_return_type(method),
-                method.get_name().expect("Method should have a name"),
+                method.name,
                 method_arguments(method).join(", "),
                 method_qualifiers(method).join(", ")
             ));
@@ -140,35 +140,23 @@ impl Generator {
         builder.maybe_add_line(&self.namespace_end(&class.namespaces));
     }
 
-    fn namespace_start(&self, namespaces: &[clang::Entity]) -> Option<String> {
+    fn namespace_start(&self, namespaces: &[String]) -> Option<String> {
         if namespaces.is_empty() {
             None
         } else if self.simplified_nested_namespaces {
-            Some(format!(
-                "namespace {} {{",
-                namespaces
-                    .iter()
-                    .map(|namespace| namespace.get_name().expect("Namespace should have a name"))
-                    .collect::<Vec<_>>()
-                    .join("::")
-            ))
+            Some(format!("namespace {} {{", namespaces.join("::")))
         } else {
             Some(
                 namespaces
                     .iter()
-                    .map(|namespace| {
-                        format!(
-                            "namespace {} {{",
-                            namespace.get_name().expect("Namespace should have a name")
-                        )
-                    })
+                    .map(|namespace| format!("namespace {} {{", namespace))
                     .collect::<Vec<_>>()
                     .join(" "),
             )
         }
     }
 
-    fn namespace_end(&self, namespaces: &[clang::Entity]) -> Option<String> {
+    fn namespace_end(&self, namespaces: &[String]) -> Option<String> {
         if namespaces.is_empty() {
             None
         } else if self.simplified_nested_namespaces {
@@ -179,7 +167,7 @@ impl Generator {
     }
 }
 
-fn wrap_with_parentheses_if_contains_comma(return_type_or_arg: String) -> String {
+fn wrap_with_parentheses_if_contains_comma(return_type_or_arg: &str) -> String {
     if return_type_or_arg.contains(',') {
         format!("({return_type_or_arg})")
     } else {
@@ -187,53 +175,37 @@ fn wrap_with_parentheses_if_contains_comma(return_type_or_arg: String) -> String
     }
 }
 
-fn method_return_type(method: &clang::Entity) -> String {
-    wrap_with_parentheses_if_contains_comma(
-        method
-            .get_result_type()
-            .expect("Method should have a return type")
-            .get_display_name(),
-    )
+fn method_return_type(method: &model::MethodToMock) -> String {
+    wrap_with_parentheses_if_contains_comma(&method.result_type)
 }
 
-fn method_arguments(method: &clang::Entity) -> Vec<String> {
+fn method_arguments(method: &model::MethodToMock) -> Vec<String> {
     method
-        .get_arguments()
-        .expect("Method should have arguments")
+        .arguments
         .iter()
         .map(|arg| {
-            let type_name = arg
-                .get_type()
-                .expect("Argument should have a type")
-                .get_display_name();
-            if let Some(arg_name) = arg.get_name() {
-                format!("{} {}", type_name, arg_name)
+            if let Some(arg_name) = &arg.name {
+                format!("{} {}", arg.type_name, arg_name)
             } else {
-                type_name
+                arg.type_name.clone()
             }
         })
-        .map(wrap_with_parentheses_if_contains_comma)
+        .map(|arg_str| wrap_with_parentheses_if_contains_comma(&arg_str))
         .collect()
 }
 
-fn method_qualifiers(method: &clang::Entity) -> Vec<String> {
+fn method_qualifiers(method: &model::MethodToMock) -> Vec<String> {
     let mut qualifiers = Vec::new();
-    if method.is_const_method() {
+    if method.is_const {
         qualifiers.push("const".to_string());
     }
-    if let Some(method_type) = method.get_type() {
-        match method_type.get_ref_qualifier() {
-            Some(clang::RefQualifier::LValue) => qualifiers.push("ref(&)".to_string()),
-            Some(clang::RefQualifier::RValue) => qualifiers.push("ref(&&)".to_string()),
-            _ => {}
-        }
+    if let Some(rq) = &method.ref_qualifier {
+        qualifiers.push(format!("ref({rq})"));
     }
-    if let Some(exception_specification) = method.get_exception_specification() {
-        if exception_specification == clang::ExceptionSpecification::BasicNoexcept {
-            qualifiers.push("noexcept".to_string());
-        }
+    if method.is_noexcept {
+        qualifiers.push("noexcept".to_string());
     }
-    if method.is_virtual_method() {
+    if method.is_virtual {
         qualifiers.push("override".to_string());
     }
     qualifiers

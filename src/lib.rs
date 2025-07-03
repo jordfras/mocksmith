@@ -280,7 +280,7 @@ impl Mocksmith {
     }
 
     fn mock_name(&self, class: &model::ClassToMock) -> String {
-        (self.name_mock)(&class.class.get_name().expect("Class should have a name"))
+        (self.name_mock)(&class.name)
     }
 
     fn tu_from_file<'a>(
