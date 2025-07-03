@@ -1,8 +1,10 @@
 mod generate;
 mod headerpath;
+mod log;
 mod model;
 pub mod naming;
 
+use capitalize::Capitalize;
 use headerpath::header_include_path;
 use std::{
     path::{Path, PathBuf},
@@ -82,11 +84,14 @@ static CLANG_MUTEX: Mutex<()> = Mutex::new(());
 
 /// Mocksmith is a struct for generating Google Mock mocks for C++ classes.
 pub struct Mocksmith {
+    log: Option<log::Logger>,
     _clang_lock: MutexGuard<'static, ()>,
     clang: clang::Clang,
     generator: generate::Generator,
 
     include_paths: Vec<PathBuf>,
+    ignore_errors: bool,
+    parse_function_bodies: bool,
     methods_to_mock: MethodsToMockStrategy,
     name_mock: Box<dyn Fn(&str) -> String>,
 }
@@ -96,12 +101,14 @@ impl Mocksmith {
     ///
     /// The function fails if another thread already holds an instance, since Clang can
     /// only be used from one thread.
-    pub fn new() -> Result<Self> {
+    pub fn new(log_write: Option<Box<dyn std::io::Write>>, verbose: bool) -> Result<Self> {
+        let log = log_write.map(|write| log::Logger::new(write, verbose));
+
         let clang_lock = CLANG_MUTEX.try_lock().map_err(|error| match error {
             TryLockError::WouldBlock => MocksmithError::Busy,
             TryLockError::Poisoned(_) => MocksmithError::Poisoned,
         })?;
-        Self::create(clang_lock)
+        Self::create(log, clang_lock)
     }
 
     /// Creates a new Mocksmith instance.
@@ -114,16 +121,22 @@ impl Mocksmith {
             CLANG_MUTEX.clear_poison();
             return Self::new_when_available();
         };
-        Self::create(clang_lock)
+        Self::create(None, clang_lock)
     }
 
-    fn create(clang_lock: MutexGuard<'static, ()>) -> Result<Self> {
+    fn create(log: Option<log::Logger>, clang_lock: MutexGuard<'static, ()>) -> Result<Self> {
+        // Create clang object before getting version to ensure libclang is loaded
+        let clang = clang::Clang::new().map_err(MocksmithError::ClangError)?;
+        verbose!(log, "{}", clang::get_version().capitalize());
         let methods_to_mock = MethodsToMockStrategy::AllVirtual;
         Ok(Self {
+            log,
             _clang_lock: clang_lock,
-            clang: clang::Clang::new().map_err(MocksmithError::ClangError)?,
+            clang,
             generator: generate::Generator::new(methods_to_mock),
             include_paths: Vec::new(),
+            ignore_errors: false,
+            parse_function_bodies: false,
             methods_to_mock,
             name_mock: Box::new(naming::default_name_mock),
         })
@@ -151,6 +164,22 @@ impl Mocksmith {
     pub fn methods_to_mock(mut self, functions: MethodsToMockStrategy) -> Self {
         self.methods_to_mock = functions;
         self.generator.methods_to_mock(functions);
+        self
+    }
+
+    /// Errors detected by Clang during parsing normally causes mock generation to fail.
+    /// Setting this option disables which may be useful, e.g., when not able to provide
+    /// all the include paths. Beware that this may lead to unknown types in arguments
+    /// being referred to as `int` in generated mocks, and entire functions and classes
+    /// being ignored (when return value of function is unknown).
+    pub fn ignore_errors(mut self, value: bool) -> Self {
+        self.ignore_errors = value;
+        self
+    }
+
+    /// For easy testability of parser warnings.
+    pub fn parse_function_bodies(mut self, value: bool) -> Self {
+        self.parse_function_bodies = value;
         self
     }
 
@@ -251,7 +280,7 @@ impl Mocksmith {
     }
 
     fn mock_name(&self, class: &model::ClassToMock) -> String {
-        (self.name_mock)(&class.class.get_name().expect("Class should have a name"))
+        (self.name_mock)(&class.name)
     }
 
     fn tu_from_file<'a>(
@@ -262,7 +291,7 @@ impl Mocksmith {
         let tu = index
             .parser(file)
             .arguments(&self.clang_arguments())
-            .skip_function_bodies(true)
+            .skip_function_bodies(!self.parse_function_bodies)
             .parse()
             .expect("Failed to parse translation unit");
         self.check_diagnostics(Some(file), &tu)?;
@@ -280,6 +309,7 @@ impl Mocksmith {
             .parser("nofile.h")
             .unsaved(&[unsaved])
             .arguments(&self.clang_arguments())
+            .skip_function_bodies(!self.parse_function_bodies)
             .parse()
             .expect("Failed to parse translation unit");
         self.check_diagnostics(None, &tu)?;
@@ -287,20 +317,37 @@ impl Mocksmith {
     }
 
     fn check_diagnostics(&self, file: Option<&Path>, tu: &clang::TranslationUnit) -> Result<()> {
-        // Return error with the first diagnostic error found
-        if let Some(diagnostic) = tu
-            .get_diagnostics()
-            .iter()
-            .filter(|diagnostic| diagnostic.get_severity() >= clang::diagnostic::Severity::Error)
-            .nth(0)
-        {
-            let location = diagnostic.get_location().get_file_location();
-            return Err(MocksmithError::ParseError {
-                message: diagnostic.get_text(),
-                file: file.map(|f| f.to_path_buf()),
-                line: location.line,
-                column: location.column,
-            });
+        let diagnostics = tu.get_diagnostics();
+        if self.ignore_errors {
+            diagnostics
+                .iter()
+                .filter(|diagnostic| {
+                    diagnostic.get_severity() >= clang::diagnostic::Severity::Error
+                })
+                .for_each(|diagnostic| log!(&self.log, "{}", diagnostic));
+        } else {
+            diagnostics
+                .iter()
+                .for_each(|diagnostic| verbose!(&self.log, "{}", diagnostic));
+        }
+
+        if !self.ignore_errors {
+            // Return error with the first diagnostic error found
+            if let Some(diagnostic) = diagnostics
+                .iter()
+                .filter(|diagnostic| {
+                    diagnostic.get_severity() >= clang::diagnostic::Severity::Error
+                })
+                .nth(0)
+            {
+                let location = diagnostic.get_location().get_file_location();
+                return Err(MocksmithError::ParseError {
+                    message: diagnostic.get_text(),
+                    file: file.map(|f| f.to_path_buf()),
+                    line: location.line,
+                    column: location.column,
+                });
+            }
         }
         Ok(())
     }
@@ -332,10 +379,13 @@ mod tests {
 
     #[test]
     fn test_new_with_threads() {
-        let mocksmith = Mocksmith::new().unwrap();
+        let mocksmith = Mocksmith::new(None, false).unwrap();
 
         let handle = std::thread::spawn(|| {
-            assert!(matches!(Mocksmith::new(), Err(MocksmithError::Busy)));
+            assert!(matches!(
+                Mocksmith::new(None, false),
+                Err(MocksmithError::Busy)
+            ));
         });
         handle.join().unwrap();
 

@@ -49,6 +49,25 @@ struct Arguments {
     #[arg(long, requires = "output")]
     msvc_allow_deprecated: bool,
 
+    /// Ignores errors from parsing the C++ code. This may lead to unknown types in
+    /// arguments being referred to as `int` and entire functions and classes being
+    /// ignored (when return value of function is unknown)
+    #[arg(long)]
+    ignore_errors: bool,
+
+    /// Enables verbose output, printing debug information to stdout if writing mocks to
+    /// file, otherwise to stderr.
+    #[arg(short = 'v', long, group = "logging")]
+    verbose: bool,
+
+    /// Disables all log output, other than printing of reason for failure.
+    #[arg(short = 's', long, group = "logging")]
+    silent: bool,
+
+    /// Option for testability of emitted warnings.
+    #[arg(long, hide = true)]
+    parse_function_bodies: bool,
+
     /// Paths to the header files to mock. If no header files are provided, the
     /// program reads from stdin and generates mocks for the content.
     #[arg(value_name = "HEADER")]
@@ -82,10 +101,20 @@ fn arguments() -> Arguments {
 fn main() -> anyhow::Result<()> {
     let arguments = arguments();
 
-    let mut mocksmith = Mocksmith::new()
+    let log_write = if arguments.silent {
+        None
+    } else if arguments.output_dir.is_some() || arguments.output_file.is_some() {
+        Some(Box::new(std::io::stdout()) as Box<dyn std::io::Write>)
+    } else {
+        Some(Box::new(std::io::stderr()) as Box<dyn std::io::Write>)
+    };
+
+    let mut mocksmith = Mocksmith::new(log_write, arguments.verbose)
         .context("Could not create Mocksmith instance")?
         .include_paths(&arguments.include_dir)
-        .msvc_allow_overriding_deprecated_methods(arguments.msvc_allow_deprecated);
+        .ignore_errors(arguments.ignore_errors)
+        .msvc_allow_overriding_deprecated_methods(arguments.msvc_allow_deprecated)
+        .parse_function_bodies(arguments.parse_function_bodies);
     if let Some(name_sed_replacement) = &arguments.name_mock_sed_replacement {
         let namer = naming::SedReplacement::from_sed_replacement(name_sed_replacement)?;
         mocksmith = mocksmith.mock_name_fun(move |class_name| namer.name(class_name));
