@@ -30,14 +30,14 @@ struct Arguments {
     /// If set, all generated mocks are written to the specified file. If neither output
     /// file or directory is specified, the mocks are printed to stdout. Input from stdin
     /// always generates output to stdout.
-    #[arg(short = 'o', long, group = "output", requires = "source_file")]
+    #[arg(short = 'o', long, group = "output", requires = "source_files")]
     output_file: Option<PathBuf>,
 
     /// If set, all generated mocks are written to files in the specified directory.
     /// Files are after the file of mocks' source class header file. If neither output
     /// file or directory is specified, the mocks are printed to stdout. Input from stdin
     /// alwyas generates output to stdout.
-    #[arg(short = 'd', long, group = "output", requires = "source_file")]
+    #[arg(short = 'd', long, group = "output", requires = "source_files")]
     output_dir: Option<PathBuf>,
 
     /// Forces writing output files without checking if the content has changed.
@@ -71,7 +71,7 @@ struct Arguments {
     /// Paths to the header files to mock. If no header files are provided, the
     /// program reads from stdin and generates mocks for the content.
     #[arg(value_name = "HEADER")]
-    source_file: Vec<PathBuf>,
+    source_files: Vec<PathBuf>,
 }
 
 fn maybe_write_file(file: &Path, content: &str, always_write: bool) -> anyhow::Result<()> {
@@ -141,7 +141,7 @@ fn main() -> anyhow::Result<()> {
             Box::new(naming::default_name_output_file)
         };
 
-    if arguments.source_file.is_empty() {
+    if arguments.source_files.is_empty() {
         let mut content = String::new();
         std::io::stdin()
             .read_to_string(&mut content)
@@ -154,7 +154,7 @@ fn main() -> anyhow::Result<()> {
                 print!("{}", mock.code);
             });
     } else if arguments.output_file.is_some() {
-        let header = mocksmith.create_mock_header_for_files(&arguments.source_file)?;
+        let header = mocksmith.create_mock_header_for_files(&arguments.source_files)?;
         maybe_write_file(
             &arguments.output_file.unwrap(),
             &header.code,
@@ -162,7 +162,7 @@ fn main() -> anyhow::Result<()> {
         )?;
     } else if arguments.output_dir.is_some() {
         let headers = arguments
-            .source_file
+            .source_files
             .iter()
             .map(|header| {
                 mocksmith
@@ -181,7 +181,7 @@ fn main() -> anyhow::Result<()> {
             maybe_write_file(&output_file, &header.code, arguments.always_write)
         })?;
     } else {
-        for header in arguments.source_file {
+        for header in arguments.source_files {
             mocksmith
                 .create_mocks_for_file(header.as_path())
                 .with_context(|| format!("Could not create mocks for file {}", header.display()))?
