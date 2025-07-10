@@ -4,6 +4,14 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 authors = ["Thomas Johannesson"]
+description = """
+Mocksmith is a command line utility and a Rust library to automatically create C++ mocks
+for the Google Mock (gMock) framework.
+"""
+repository = "https://github.com/jordfras/mocksmith"
+keywords = ["mock", "mocking", "google mock", "gMock", "google test", "googletest", "c++"]
+categories = ["command-line-utilities", "development-tools"]
+exclude = ["/.github/"]
 
 [dependencies]
 anyhow = "1.0"
