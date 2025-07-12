@@ -9,7 +9,7 @@ Mocksmith is a command line utility and a Rust library to automatically create C
 for the Google Mock (gMock) framework.
 """
 repository = "https://github.com/jordfras/mocksmith"
-keywords = ["mock", "mocking", "google mock", "gMock", "google test", "googletest", "c++"]
+keywords = ["mock", "googlemock", "gMock", "googletest", "c++"]
 categories = ["command-line-utilities", "development-tools"]
 exclude = ["/.github/"]
 
