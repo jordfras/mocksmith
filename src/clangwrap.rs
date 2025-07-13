@@ -14,8 +14,9 @@ static CLANG_MUTEX: Mutex<()> = Mutex::new(());
 // at a time, at least via this library.
 pub(crate) struct ClangWrap {
     log: Option<log::Logger>,
-    _clang_lock: MutexGuard<'static, ()>,
     clang: clang::Clang,
+    // After clang::Clang to ensure releasing lock after Clang is dropped
+    _clang_lock: MutexGuard<'static, ()>,
     ignore_errors: bool,
     parse_function_bodies: bool,
 }
