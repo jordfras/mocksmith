@@ -38,10 +38,11 @@ pub(crate) struct Arguments {
     #[arg(short = 'w', long)]
     pub(crate) always_write: bool,
 
-    /// The C++ standard to use when parsing the source header files.
+    /// The C++ standard to use when parsing the source header files. Modern Google Mock
+    /// version require at least C++11, so this is the oldest supported version.
     #[arg(long, value_parser = [
-        "c++98", "c++03", "c++11", "c++14", "c++17", "c++20", "c++23", "c++2c",
-        "gnu+98", "gnu++03", "gnu++11", "gnu++14", "gnu++17", "gnu++20", "gnu++23", "gnu++2c"])]
+        "c++11", "c++14", "c++17", "c++20", "c++23", "c++2c",
+        "gnu++11", "gnu++14", "gnu++17", "gnu++20", "gnu++23", "gnu++2c"])]
     pub(crate) std: Option<String>,
 
     /// Adds MSVC compiler pragmas to disable warnings for overriding deprecated methods.
