@@ -351,3 +351,49 @@ fn pragma_added_when_allowing_overriding_deprecated() {
         ))
     );
 }
+
+#[test]
+fn cpp_standard_affects_parsing() {
+    let source_file = temp_file_from(&lines!("int x = 100'000;"));
+
+    let mut mocksmith = Mocksmith::new_with_options(&["--std=c++11"])
+        .source_file(source_file.path())
+        .run();
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("Parse error"));
+    assert!(!mocksmith.wait().success());
+
+    let mut mocksmith = Mocksmith::new_with_options(&["--std=c++14"])
+        .source_file(source_file.path())
+        .run();
+    assert!(mocksmith.wait().success());
+}
+
+#[test]
+fn cpp_standard_affects_namespace_nesting() {
+    let source_file = temp_file_from(&lines!(
+        "namespace A {",
+        "namespace B {",
+        &some_class("ISomething"),
+        "}",
+        "}"
+    ));
+
+    let mut mocksmith = Mocksmith::new_with_options(&["--std=c++11"])
+        .source_file(source_file.path())
+        .run();
+    assert_ok!(mocksmith.expect_stdout(&format!(
+        "namespace A {{ namespace B {{\n{}}}}}\n",
+        &some_mock("ISomething", "MockSomething")
+    )));
+    assert!(mocksmith.wait().success());
+
+    let mut mocksmith = Mocksmith::new_with_options(&["--std=c++17"])
+        .source_file(source_file.path())
+        .run();
+    assert_ok!(mocksmith.expect_stdout(&format!(
+        "namespace A::B {{\n{}}}\n",
+        &some_mock("ISomething", "MockSomething")
+    )));
+    assert!(mocksmith.wait().success());
+}
