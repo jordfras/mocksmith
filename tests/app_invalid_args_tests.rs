@@ -100,3 +100,11 @@ fn cant_be_verbose_when_silent() {
     assert!(stderr.contains("'--verbose' cannot be used with '--silent'"));
     assert!(!mocksmith.wait().success());
 }
+
+#[test]
+fn cant_specify_illegal_cpp_standard() {
+    let mut mocksmith = Mocksmith::new_with_options(&["--std=c++99"]).run();
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("invalid value 'c++99' for '--std <STD>'"));
+    assert!(!mocksmith.wait().success());
+}

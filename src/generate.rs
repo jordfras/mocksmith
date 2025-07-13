@@ -149,7 +149,7 @@ impl Generator {
             Some(
                 namespaces
                     .iter()
-                    .map(|namespace| format!("namespace {} {{", namespace))
+                    .map(|namespace| format!("namespace {namespace} {{"))
                     .collect::<Vec<_>>()
                     .join(" "),
             )

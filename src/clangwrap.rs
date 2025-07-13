@@ -14,9 +14,11 @@ static CLANG_MUTEX: Mutex<()> = Mutex::new(());
 // at a time, at least via this library.
 pub(crate) struct ClangWrap {
     log: Option<log::Logger>,
-    _clang_lock: MutexGuard<'static, ()>,
     clang: clang::Clang,
+    // After clang::Clang to ensure releasing lock after Clang is dropped
+    _clang_lock: MutexGuard<'static, ()>,
     ignore_errors: bool,
+    cpp_standard: Option<String>,
     parse_function_bodies: bool,
 }
 
@@ -50,12 +52,17 @@ impl ClangWrap {
             _clang_lock: clang_lock,
             clang,
             ignore_errors: false,
+            cpp_standard: None,
             parse_function_bodies: false,
         })
     }
 
     pub(crate) fn set_ignore_errors(&mut self, value: bool) {
         self.ignore_errors = value;
+    }
+
+    pub(crate) fn set_cpp_standard(&mut self, standard: Option<String>) {
+        self.cpp_standard = standard;
     }
 
     pub(crate) fn set_parse_function_bodies(&mut self, value: bool) {
@@ -145,7 +152,10 @@ impl ClangWrap {
             "--language=c++".to_string(),
             // Default to C++17 standard which should be sufficient for most use cases and
             // fully supported from Clang 5
-            "-std=c++17".to_string(),
+            format!(
+                "-std={}",
+                self.cpp_standard.as_ref().unwrap_or(&"c++17".to_string())
+            ),
             // Since we normally process header files, ignore warning about #pragma once
             "-Wno-pragma-once-outside-header".to_string(),
         ];

@@ -185,7 +185,7 @@ feature. Thus, libclang must be in the `PATH` since it cannot be located at runt
 automatically.
 
 If you have problems with Mocksmith not finding your libclang installation, consult the
-clang-rs [documentation](https://docs.rs/clang/latest/clang/).
+clang-sys [documentation](https://github.com/KyleMayes/clang-sys#dependencies).
 
 
 ## Alternatives

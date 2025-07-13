@@ -35,7 +35,7 @@ impl Logger {
 
     pub(crate) fn log(&self, message: &str) {
         let mut write = self.write.borrow_mut();
-        writeln!(write, "{}", message).unwrap_or_else(|_| eprintln!("{}", message));
+        writeln!(write, "{message}").unwrap_or_else(|_| eprintln!("{message}"));
     }
 }
 

@@ -19,7 +19,7 @@ pub fn default_name_mock(class_name: &str) -> String {
     {
         format!("Mock{}", class_name.strip_prefix("I").unwrap())
     } else {
-        format!("Mock{}", class_name)
+        format!("Mock{class_name}")
     }
 }
 
@@ -67,8 +67,7 @@ impl SedReplacement {
         Ok(Self {
             regex: regex::Regex::new(&format!("^{regex}$")).map_err(|err| {
                 crate::MocksmithError::InvalidSedReplacement(format!(
-                    "Invalid regex for name replacement: {}",
-                    err
+                    "Invalid regex for name replacement: {err}"
                 ))
             })?,
             name_pattern: name_pattern.to_string(),
@@ -82,8 +81,7 @@ impl SedReplacement {
         let parts: Vec<&str> = sed_replacement.split('/').collect();
         if !sed_replacement.ends_with('/') || parts.len() != 4 || parts[0] != "s" {
             return Err(crate::MocksmithError::InvalidSedReplacement(format!(
-                "Got {}, but expected s/<regex>/<replacement>/",
-                sed_replacement
+                "Got {sed_replacement}, but expected s/<regex>/<replacement>/"
             )));
         }
         Self::new(parts[1], parts[2])
@@ -94,7 +92,7 @@ impl SedReplacement {
     /// class name.
     pub fn name(&self, class_name: &str) -> String {
         let Some(captures) = self.regex.captures(class_name) else {
-            return format!("Mock{}", class_name);
+            return format!("Mock{class_name}");
         };
 
         let mut name = self.name_pattern.clone();

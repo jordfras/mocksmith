@@ -157,6 +157,13 @@ impl Mocksmith {
         self
     }
 
+    /// Sets the C++ standard to use when parsing the source header files. Default is
+    /// "c++17".
+    pub fn cpp_standard(mut self, standard: Option<String>) -> Self {
+        self.clangwrap.set_cpp_standard(standard);
+        self
+    }
+
     /// For easy testability of parser warnings.
     pub fn parse_function_bodies(mut self, value: bool) -> Self {
         self.clangwrap.set_parse_function_bodies(value);
