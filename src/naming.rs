@@ -42,14 +42,14 @@ pub fn default_name_output_file(header: &MockHeader) -> String {
 
     // Otherwise use the same name of the single source file, with a "_mocks" suffix to
     // the stem
-    if header.source_files.len() == 1 {
-        if let Some(stem) = header.source_files[0].file_stem() {
-            let mut file_name = stem.to_os_string();
-            file_name.push("_mocks");
-            file_name.push(".");
-            file_name.push(extension);
-            return file_name.to_string_lossy().to_string();
-        }
+    if header.source_files.len() == 1
+        && let Some(stem) = header.source_files[0].file_stem()
+    {
+        let mut file_name = stem.to_os_string();
+        file_name.push("_mocks");
+        file_name.push(".");
+        file_name.push(extension);
+        return file_name.to_string_lossy().to_string();
     }
 
     // If there is no source file, fallback to "mocks.h"
