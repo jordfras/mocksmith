@@ -141,17 +141,17 @@ impl Mocksmith {
 
     /// Sets which methods to mock in the classes. Default is `AllVirtual`, which mocks
     /// all virtual methods.
-    pub fn methods_to_mock(mut self, functions: MethodsToMockStrategy) -> Self {
-        self.methods_to_mock = functions;
-        self.generator.methods_to_mock(functions);
+    pub fn methods_to_mock(mut self, methods: MethodsToMockStrategy) -> Self {
+        self.methods_to_mock = methods;
+        self.generator.methods_to_mock(methods);
         self
     }
 
     /// Errors detected by Clang during parsing normally causes mock generation to fail.
     /// Setting this option disables which may be useful, e.g., when not able to provide
     /// all the include paths. Beware that this may lead to unknown types in arguments
-    /// being referred to as `int` in generated mocks, and entire functions and classes
-    /// being ignored (when return value of function is unknown).
+    /// being referred to as `int` in generated mocks, and entire methods and classes
+    /// being ignored (when return value of method is unknown).
     pub fn ignore_errors(mut self, value: bool) -> Self {
         self.clangwrap.set_ignore_errors(value);
         self

@@ -44,8 +44,8 @@ impl Generator {
         }
     }
 
-    pub(crate) fn methods_to_mock(&mut self, functions: MethodsToMockStrategy) {
-        self.methods_to_mock = functions;
+    pub(crate) fn methods_to_mock(&mut self, methods: MethodsToMockStrategy) {
+        self.methods_to_mock = methods;
     }
 
     pub(crate) fn add_deprecation_pragma(&mut self, value: bool) {
