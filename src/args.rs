@@ -51,8 +51,8 @@ pub(crate) struct Arguments {
     pub(crate) msvc_allow_deprecated: bool,
 
     /// Ignores errors from parsing the C++ code. This may lead to unknown types in
-    /// arguments being referred to as `int`, and entire functions and classes being
-    /// ignored (when the return value of a function is unknown).
+    /// arguments being referred to as `int`, and entire methods and classes being
+    /// ignored (when the return value of a method is unknown).
     #[arg(long)]
     pub(crate) ignore_errors: bool,
 
