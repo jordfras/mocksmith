@@ -108,3 +108,11 @@ fn cant_specify_illegal_cpp_standard() {
     assert!(stderr.contains("invalid value 'c++99' for '--std <STD>'"));
     assert!(!mocksmith.wait().success());
 }
+
+#[test]
+fn cant_specify_illegal_method_filter_value() {
+    let mut mocksmith = Mocksmith::new_with_options(&["--methods=unknown"]).run();
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("invalid value 'unknown' for '--methods <METHODS_TO_MOCK>'"));
+    assert!(!mocksmith.wait().success());
+}

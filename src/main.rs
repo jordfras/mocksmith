@@ -42,6 +42,7 @@ fn main() -> anyhow::Result<()> {
     let mut mocksmith = Mocksmith::new(log_write, arguments.verbose)
         .context("Could not create Mocksmith instance")?
         .include_paths(&arguments.include_dir)
+        .methods_to_mock(arguments.methods_to_mock())
         .ignore_errors(arguments.ignore_errors)
         .cpp_standard(arguments.std)
         .simplified_nested_namespaces(use_simplified_nested_namespaces)

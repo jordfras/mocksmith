@@ -1,4 +1,5 @@
 use clap::Parser;
+use mocksmith::MethodsToMockStrategy;
 use std::path::PathBuf;
 
 /// Generates mocks for the Google Mock framework (gmock) from C++ header files. If no
@@ -11,6 +12,13 @@ pub(crate) struct Arguments {
     /// to use when including the source header file from the generated mock header file.
     #[arg(short = 'I', long)]
     pub(crate) include_dir: Vec<PathBuf>,
+
+    /// Selects which methofd to mock in a class. Either all virtual methods
+    /// (default), only pure virtual methods or all non-static methods are mocked.
+    /// This also affects which classes to mock, since classes with no matching methods
+    /// are ignored.
+    #[arg(short = 'm', long = "methods", value_parser = ["virtual", "pure", "all"])]
+    pub(crate) methods_to_mock: Option<String>,
 
     /// A sed style regex replacement string to convert class names to mock names.
     #[arg(short = 'n', long = "name-mock")]
@@ -84,4 +92,19 @@ pub(crate) fn arguments() -> Arguments {
         std::process::exit(2);
     }
     arguments
+}
+
+impl Arguments {
+    pub(crate) fn methods_to_mock(&self) -> MethodsToMockStrategy {
+        if let Some(ref methods) = self.methods_to_mock {
+            match methods.as_str() {
+                "virtual" => MethodsToMockStrategy::AllVirtual,
+                "pure" => MethodsToMockStrategy::OnlyPureVirtual,
+                "all" => MethodsToMockStrategy::All,
+                _ => MethodsToMockStrategy::AllVirtual,
+            }
+        } else {
+            MethodsToMockStrategy::AllVirtual
+        }
+    }
 }
