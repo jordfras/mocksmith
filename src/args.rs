@@ -25,12 +25,17 @@ pub(crate) struct Arguments {
     pub(crate) class_filter: Option<String>,
 
     /// A sed style regex replacement string to convert class names to mock names.
-    #[arg(short = 'n', long = "name-mock")]
+    #[arg(short = 'n', long = "name-mock", value_name = "SED_REPLACEMENT")]
     pub(crate) name_mock_sed_replacement: Option<String>,
 
     /// A sed style regex replacement string to convert input header file names to output
     /// header file names.
-    #[arg(short = 'f', long = "name-output-file", requires = "output_dir")]
+    #[arg(
+        short = 'f',
+        long = "name-output-file",
+        value_name = "SED_REPLACEMENT",
+        requires = "output_dir"
+    )]
     pub(crate) name_output_file_sed_replacement: Option<String>,
 
     /// If set, all generated mocks are written to the specified file. If neither an output
