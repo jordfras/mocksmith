@@ -66,14 +66,19 @@ pub struct Mock {
 /// Representation of a mock header produced by Mocksmith.
 #[derive(Debug, PartialEq)]
 pub struct MockHeader {
-    /// Path to the header files of the mocked classes
-    pub source_files: Vec<PathBuf>,
-    /// Name of the mocked classes
-    pub parent_names: Vec<String>,
-    /// Name of the mocks, same order as `parent_name`
-    pub names: Vec<String>,
-    /// Code for the mock header
+    /// The mocks within the header
+    pub mocks: Vec<Mock>,
+    /// Code for the complete mock header
     pub code: String,
+}
+
+impl crate::MockHeader {
+    fn new() -> Self {
+        Self {
+            mocks: Vec::new(),
+            code: String::new(),
+        }
+    }
 }
 
 /// Mocksmith is a struct for generating Google Mock mocks for C++ classes.
@@ -231,26 +236,15 @@ impl Mocksmith {
             .map(|f| self.header_include_path(f.as_ref()))
             .collect();
 
-        let mut classes = Vec::<model::ClassToMock>::new();
+        let mut header = MockHeader::new();
         for file in files {
-            let mut some_classes =
-                self.clangwrap
-                    .with_tu_from_file(&self.include_paths, file.as_ref(), |tu| {
-                        Ok(model::classes_in_translation_unit(tu, self.methods_to_mock))
-                    })?;
-            classes.append(&mut some_classes);
+            let mocks = self.create_mocks_for_file(file.as_ref())?;
+            header.mocks.extend(mocks);
         }
 
-        let mock_names = classes
-            .iter()
-            .map(|class| self.mock_name(class))
-            .collect::<Vec<_>>();
-
-        let mut header = self
+        header.code = self
             .generator
-            .header(&source_file_include_paths, &classes, &mock_names);
-        // Store source files in the MockHeader object for reference
-        header.source_files = files.iter().map(|f| f.as_ref().to_path_buf()).collect();
+            .header(&source_file_include_paths, &header.mocks);
 
         Ok(header)
     }
