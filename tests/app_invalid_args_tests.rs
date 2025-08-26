@@ -15,8 +15,7 @@ fn input_from_stdin_doesnt_work_when_output_to_file_or_dir() {
         "--output-file={}",
         output.path().to_string_lossy()
     )])
-    .run()
-    .stdin(&some_class("ISomething"));
+    .run();
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains("required arguments were not provided"));
     assert!(!mocksmith.wait().success());
@@ -26,8 +25,7 @@ fn input_from_stdin_doesnt_work_when_output_to_file_or_dir() {
         "--output-dir={}",
         output_dir.path().to_string_lossy()
     )])
-    .run()
-    .stdin(&some_class("ISomething"));
+    .run();
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains("required arguments were not provided"));
     assert!(!mocksmith.wait().success());
