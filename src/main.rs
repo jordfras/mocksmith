@@ -45,6 +45,7 @@ fn main() -> anyhow::Result<()> {
         .methods_to_mock(arguments.methods_to_mock())
         .ignore_errors(arguments.ignore_errors)
         .cpp_standard(arguments.std)
+        .additional_clang_args(arguments.clang_args)
         .simplified_nested_namespaces(use_simplified_nested_namespaces)
         .msvc_allow_overriding_deprecated_methods(arguments.msvc_allow_deprecated)
         .parse_function_bodies(arguments.parse_function_bodies);

@@ -486,3 +486,31 @@ fn class_filter_option_affects_which_classes_are_mocked() {
     )));
     assert!(mocksmith.wait().success());
 }
+
+#[test]
+fn additional_clang_args_are_passed_to_parser() {
+    let source_file = temp_file_from(&lines!(
+        "#ifdef SOMETHING",
+        "class IFoo {",
+        "public:",
+        "  virtual void foo() = 0;",
+        "};",
+        "#endif"
+    ));
+
+    let mut mocksmith = Mocksmith::new().source_file(source_file.path()).run();
+    assert_ok!(mocksmith.expect_stdout(""));
+    assert!(mocksmith.wait().success());
+
+    let mut mocksmith = Mocksmith::new_with_options(&["--clang-arg=-DSOMETHING"])
+        .source_file(source_file.path())
+        .run();
+    assert_ok!(mocksmith.expect_stdout(&lines!(
+        "class MockFoo : public IFoo",
+        "{",
+        "public:",
+        "  MOCK_METHOD(void, foo, (), (override));",
+        "};"
+    )));
+    assert!(mocksmith.wait().success());
+}

@@ -180,6 +180,12 @@ impl Mocksmith {
         self
     }
 
+    /// Sets additional arguments to the clang C++ parser.
+    pub fn additional_clang_args(mut self, args: Vec<String>) -> Self {
+        self.clangwrap.set_additional_clang_args(args);
+        self
+    }
+
     /// For easy testability of parser warnings.
     pub fn parse_function_bodies(mut self, value: bool) -> Self {
         self.clangwrap.set_parse_function_bodies(value);

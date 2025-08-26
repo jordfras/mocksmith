@@ -62,6 +62,10 @@ pub(crate) struct Arguments {
         "gnu++11", "gnu++14", "gnu++17", "gnu++20", "gnu++23", "gnu++2c"])]
     pub(crate) std: Option<String>,
 
+    /// Additional arguments to the clang C++ parser.
+    #[arg(short = 'a', long = "clang-arg", value_name = "ARG")]
+    pub(crate) clang_args: Vec<String>,
+
     /// Adds MSVC compiler pragmas to disable warnings for overriding deprecated methods.
     /// This option can only be used when producing header files.
     #[arg(long, requires = "output")]
