@@ -88,6 +88,7 @@ pub struct Mocksmith {
 
     include_paths: Vec<PathBuf>,
     methods_to_mock: MethodsToMockStrategy,
+    filter_class: Box<dyn Fn(&str) -> bool>,
     name_mock: Box<dyn Fn(&str) -> String>,
 }
 
@@ -122,6 +123,7 @@ impl Mocksmith {
             generator: generate::Generator::new(methods_to_mock),
             include_paths: Vec::new(),
             methods_to_mock,
+            filter_class: Box::new(|_| true),
             name_mock: Box::new(naming::default_name_mock),
         };
         Ok(mocksmith)
@@ -149,6 +151,13 @@ impl Mocksmith {
     pub fn methods_to_mock(mut self, methods: MethodsToMockStrategy) -> Self {
         self.methods_to_mock = methods;
         self.generator.methods_to_mock(methods);
+        self
+    }
+
+    /// Sets a function to filter which classes to mock. The function takes the name of
+    /// a class and should return `true` if the class should be mocked.
+    pub fn class_filter_fun(mut self, filter: impl Fn(&str) -> bool + 'static) -> Self {
+        self.filter_class = Box::new(filter);
         self
     }
 
@@ -261,6 +270,7 @@ impl Mocksmith {
         let classes = model::classes_in_translation_unit(tu, self.methods_to_mock);
         Ok(classes
             .iter()
+            .filter(|class| (self.filter_class)(class.name.as_str()))
             .map(|class| self.generator.mock(class, &self.mock_name(class)))
             .collect())
     }

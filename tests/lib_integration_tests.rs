@@ -489,3 +489,36 @@ fn generate_pure_virtual_methods_mocks_pure_virtual_methods_only() {
         )
     );
 }
+
+#[test]
+fn class_filter_avoids_mocking_unwanted_class() {
+    let mocksmith = Mocksmith::new_when_available()
+        .unwrap()
+        .class_filter_fun(|class_name| class_name.starts_with("I"));
+    let cpp_classes = "
+          class ISomething {
+          public:
+            virtual ~ISomething() = default;
+            virtual void bar() = 0;
+          };
+          class ConcreteSomething : public ISomething{
+          public:
+            void bar() override {};
+            virtual void other_fun() {};
+          };";
+
+    let mocks = mocksmith
+        .create_mocks_from_string(cpp_classes)
+        .expect("Mocks should be generated");
+    assert_eq!(mocks.len(), 1, "The concrete class should not be mocked");
+    assert_mocks!(
+        Ok::<Vec<mocksmith::Mock>, String>(mocks),
+        lines!(
+            "class MockSomething : public ISomething",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, bar, (), (override));",
+            "};"
+        )
+    );
+}
