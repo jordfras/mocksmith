@@ -460,3 +460,29 @@ fn method_filter_option_affects_which_methods_are_mocked() {
     )));
     assert!(mocksmith.wait().success());
 }
+
+#[test]
+fn class_filter_option_affects_which_classes_are_mocked() {
+    let source_file = temp_file_from(&lines!(
+        "class IFoo {",
+        "public:",
+        "  virtual void foo() = 0;",
+        "};",
+        "class IBar {",
+        "public:",
+        "  virtual void bar() = 0;",
+        "};"
+    ));
+
+    let mut mocksmith = Mocksmith::new_with_options(&["--class-filter=Bar"])
+        .source_file(source_file.path())
+        .run();
+    assert_ok!(mocksmith.expect_stdout(&lines!(
+        "class MockBar : public IBar",
+        "{",
+        "public:",
+        "  MOCK_METHOD(void, bar, (), (override));",
+        "};"
+    )));
+    assert!(mocksmith.wait().success());
+}

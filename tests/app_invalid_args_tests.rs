@@ -116,3 +116,11 @@ fn cant_specify_illegal_method_filter_value() {
     assert!(stderr.contains("invalid value 'unknown' for '--methods <METHODS_TO_MOCK>'"));
     assert!(!mocksmith.wait().success());
 }
+
+#[test]
+fn cant_specify_invalid_class_filter_regex() {
+    let mut mocksmith = Mocksmith::new_with_options(&["--class-filter=("]).run();
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("Invalid regex string: Invalid class filter"));
+    assert!(!mocksmith.wait().success());
+}

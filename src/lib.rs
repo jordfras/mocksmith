@@ -19,6 +19,8 @@ pub enum MocksmithError {
     ClangError(String),
     #[error("Invalid sed style replacement string: {0}")]
     InvalidSedReplacement(String),
+    #[error("Invalid regex string: {0}")]
+    InvalidRegex(String),
     #[error("Parse error {}at line {}, column {}: {}",
             if file.is_none() {
                 String::new()

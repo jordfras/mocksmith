@@ -20,6 +20,10 @@ pub(crate) struct Arguments {
     #[arg(short = 'm', long = "methods", value_parser = ["virtual", "pure", "all"])]
     pub(crate) methods_to_mock: Option<String>,
 
+    /// A regex to filter classes to mock by name.
+    #[arg(short = 'c', long = "class-filter", value_name = "FILTER")]
+    pub(crate) class_filter: Option<String>,
+
     /// A sed style regex replacement string to convert class names to mock names.
     #[arg(short = 'n', long = "name-mock")]
     pub(crate) name_mock_sed_replacement: Option<String>,

@@ -48,6 +48,12 @@ fn main() -> anyhow::Result<()> {
         .simplified_nested_namespaces(use_simplified_nested_namespaces)
         .msvc_allow_overriding_deprecated_methods(arguments.msvc_allow_deprecated)
         .parse_function_bodies(arguments.parse_function_bodies);
+    if let Some(class_filter) = &arguments.class_filter {
+        let regex = regex::Regex::new(class_filter).map_err(|err| {
+            mocksmith::MocksmithError::InvalidRegex(format!("Invalid class filter: {err}"))
+        })?;
+        mocksmith = mocksmith.class_filter_fun(move |class_name| regex.is_match(class_name));
+    }
     if let Some(name_sed_replacement) = &arguments.name_mock_sed_replacement {
         let namer = naming::SedReplacement::from_sed_replacement(name_sed_replacement)?;
         mocksmith = mocksmith.mock_name_fun(move |class_name| namer.name(class_name));
