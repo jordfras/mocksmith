@@ -167,7 +167,7 @@ $ cat code/itemcomponent/mocks/MockMyItem.h
 
 It is possible to ignore errors from libclang with the `--ignore-errors` option but it is
 not recommended since clang will report unknown types as `int`. It also fails to identify
-functions as virtual when returning unknown types. Errors will still be logged, unless the
+methods as virtual when returning unknown types. Errors will still be logged, unless the
 `--silent` option is used.
 
 

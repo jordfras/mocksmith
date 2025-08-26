@@ -42,11 +42,19 @@ fn main() -> anyhow::Result<()> {
     let mut mocksmith = Mocksmith::new(log_write, arguments.verbose)
         .context("Could not create Mocksmith instance")?
         .include_paths(&arguments.include_dir)
+        .methods_to_mock(arguments.methods_to_mock())
         .ignore_errors(arguments.ignore_errors)
         .cpp_standard(arguments.std)
+        .additional_clang_args(arguments.clang_args)
         .simplified_nested_namespaces(use_simplified_nested_namespaces)
         .msvc_allow_overriding_deprecated_methods(arguments.msvc_allow_deprecated)
         .parse_function_bodies(arguments.parse_function_bodies);
+    if let Some(class_filter) = &arguments.class_filter {
+        let regex = regex::Regex::new(class_filter).map_err(|err| {
+            mocksmith::MocksmithError::InvalidRegex(format!("Invalid class filter: {err}"))
+        })?;
+        mocksmith = mocksmith.class_filter_fun(move |class_name| regex.is_match(class_name));
+    }
     if let Some(name_sed_replacement) = &arguments.name_mock_sed_replacement {
         let namer = naming::SedReplacement::from_sed_replacement(name_sed_replacement)?;
         mocksmith = mocksmith.mock_name_fun(move |class_name| namer.name(class_name));
@@ -59,11 +67,15 @@ fn main() -> anyhow::Result<()> {
             let namer =
                 naming::SedReplacement::from_sed_replacement(name_output_file_sed_replacement)?;
             Box::new(move |header: &mocksmith::MockHeader| {
-                // Since only used with --output_dir there should be exactly one source
-                // header per mock output file
-                assert!(header.source_files.len() == 1);
+                // We should not call this if there are no mocks
+                assert!(!header.mocks.is_empty());
+                // Since only used with --output_dir there should be a source file
+                assert!(header.mocks[0].source_file.is_some());
                 namer.name(
-                    &header.source_files[0]
+                    &header.mocks[0]
+                        .source_file
+                        .as_ref()
+                        .unwrap()
                         .file_name()
                         .expect("Input source path should be a file")
                         .to_string_lossy(),
@@ -109,8 +121,13 @@ fn main() -> anyhow::Result<()> {
             .collect::<anyhow::Result<Vec<MockHeader>>>()?;
         let output_dir = arguments.output_dir.unwrap();
         headers.into_iter().try_for_each(|header| {
-            let output_file = output_dir.join(name_output_file(&header));
-            maybe_write_file(&output_file, &header.code, arguments.always_write)
+            if !header.mocks.is_empty() {
+                let output_file = output_dir.join(name_output_file(&header));
+                maybe_write_file(&output_file, &header.code, arguments.always_write)
+            } else {
+                // We might want to log something if no mocks are found
+                Ok(())
+            }
         })?;
     } else {
         for header in arguments.source_files {

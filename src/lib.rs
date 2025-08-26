@@ -19,6 +19,8 @@ pub enum MocksmithError {
     ClangError(String),
     #[error("Invalid sed style replacement string: {0}")]
     InvalidSedReplacement(String),
+    #[error("Invalid regex string: {0}")]
+    InvalidRegex(String),
     #[error("Parse error {}at line {}, column {}: {}",
             if file.is_none() {
                 String::new()
@@ -66,14 +68,19 @@ pub struct Mock {
 /// Representation of a mock header produced by Mocksmith.
 #[derive(Debug, PartialEq)]
 pub struct MockHeader {
-    /// Path to the header files of the mocked classes
-    pub source_files: Vec<PathBuf>,
-    /// Name of the mocked classes
-    pub parent_names: Vec<String>,
-    /// Name of the mocks, same order as `parent_name`
-    pub names: Vec<String>,
-    /// Code for the mock header
+    /// The mocks within the header
+    pub mocks: Vec<Mock>,
+    /// Code for the complete mock header
     pub code: String,
+}
+
+impl crate::MockHeader {
+    fn new() -> Self {
+        Self {
+            mocks: Vec::new(),
+            code: String::new(),
+        }
+    }
 }
 
 /// Mocksmith is a struct for generating Google Mock mocks for C++ classes.
@@ -83,6 +90,7 @@ pub struct Mocksmith {
 
     include_paths: Vec<PathBuf>,
     methods_to_mock: MethodsToMockStrategy,
+    filter_class: Box<dyn Fn(&str) -> bool>,
     name_mock: Box<dyn Fn(&str) -> String>,
 }
 
@@ -117,6 +125,7 @@ impl Mocksmith {
             generator: generate::Generator::new(methods_to_mock),
             include_paths: Vec::new(),
             methods_to_mock,
+            filter_class: Box::new(|_| true),
             name_mock: Box::new(naming::default_name_mock),
         };
         Ok(mocksmith)
@@ -141,17 +150,24 @@ impl Mocksmith {
 
     /// Sets which methods to mock in the classes. Default is `AllVirtual`, which mocks
     /// all virtual methods.
-    pub fn methods_to_mock(mut self, functions: MethodsToMockStrategy) -> Self {
-        self.methods_to_mock = functions;
-        self.generator.methods_to_mock(functions);
+    pub fn methods_to_mock(mut self, methods: MethodsToMockStrategy) -> Self {
+        self.methods_to_mock = methods;
+        self.generator.methods_to_mock(methods);
+        self
+    }
+
+    /// Sets a function to filter which classes to mock. The function takes the name of
+    /// a class and should return `true` if the class should be mocked.
+    pub fn class_filter_fun(mut self, filter: impl Fn(&str) -> bool + 'static) -> Self {
+        self.filter_class = Box::new(filter);
         self
     }
 
     /// Errors detected by Clang during parsing normally causes mock generation to fail.
     /// Setting this option disables which may be useful, e.g., when not able to provide
     /// all the include paths. Beware that this may lead to unknown types in arguments
-    /// being referred to as `int` in generated mocks, and entire functions and classes
-    /// being ignored (when return value of function is unknown).
+    /// being referred to as `int` in generated mocks, and entire methods and classes
+    /// being ignored (when return value of method is unknown).
     pub fn ignore_errors(mut self, value: bool) -> Self {
         self.clangwrap.set_ignore_errors(value);
         self
@@ -161,6 +177,12 @@ impl Mocksmith {
     /// "c++17".
     pub fn cpp_standard(mut self, standard: Option<String>) -> Self {
         self.clangwrap.set_cpp_standard(standard);
+        self
+    }
+
+    /// Sets additional arguments to the clang C++ parser.
+    pub fn additional_clang_args(mut self, args: Vec<String>) -> Self {
+        self.clangwrap.set_additional_clang_args(args);
         self
     }
 
@@ -231,26 +253,15 @@ impl Mocksmith {
             .map(|f| self.header_include_path(f.as_ref()))
             .collect();
 
-        let mut classes = Vec::<model::ClassToMock>::new();
+        let mut header = MockHeader::new();
         for file in files {
-            let mut some_classes =
-                self.clangwrap
-                    .with_tu_from_file(&self.include_paths, file.as_ref(), |tu| {
-                        Ok(model::classes_in_translation_unit(tu, self.methods_to_mock))
-                    })?;
-            classes.append(&mut some_classes);
+            let mocks = self.create_mocks_for_file(file.as_ref())?;
+            header.mocks.extend(mocks);
         }
 
-        let mock_names = classes
-            .iter()
-            .map(|class| self.mock_name(class))
-            .collect::<Vec<_>>();
-
-        let mut header = self
+        header.code = self
             .generator
-            .header(&source_file_include_paths, &classes, &mock_names);
-        // Store source files in the MockHeader object for reference
-        header.source_files = files.iter().map(|f| f.as_ref().to_path_buf()).collect();
+            .header(&source_file_include_paths, &header.mocks);
 
         Ok(header)
     }
@@ -267,6 +278,7 @@ impl Mocksmith {
         let classes = model::classes_in_translation_unit(tu, self.methods_to_mock);
         Ok(classes
             .iter()
+            .filter(|class| (self.filter_class)(class.name.as_str()))
             .map(|class| self.generator.mock(class, &self.mock_name(class)))
             .collect())
     }

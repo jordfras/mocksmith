@@ -397,3 +397,120 @@ fn cpp_standard_affects_namespace_nesting() {
     )));
     assert!(mocksmith.wait().success());
 }
+
+#[test]
+fn method_filter_option_affects_which_methods_are_mocked() {
+    let source_file = temp_file_from(&lines!(
+        "class ISomething {",
+        "public:",
+        "  virtual void pure_virtual_fun() = 0;",
+        "  virtual void virtual_fun() {}",
+        "  void fun() {}",
+        "  static void static_fun() {}",
+        "};"
+    ));
+
+    let mut mocksmith = Mocksmith::new().source_file(source_file.path()).run();
+    assert_ok!(mocksmith.expect_stdout(&lines!(
+        "class MockSomething : public ISomething",
+        "{",
+        "public:",
+        "  MOCK_METHOD(void, pure_virtual_fun, (), (override));",
+        "  MOCK_METHOD(void, virtual_fun, (), (override));",
+        "};"
+    )));
+    assert!(mocksmith.wait().success());
+
+    let mut mocksmith = Mocksmith::new_with_options(&["--methods=virtual"])
+        .source_file(source_file.path())
+        .run();
+    assert_ok!(mocksmith.expect_stdout(&lines!(
+        "class MockSomething : public ISomething",
+        "{",
+        "public:",
+        "  MOCK_METHOD(void, pure_virtual_fun, (), (override));",
+        "  MOCK_METHOD(void, virtual_fun, (), (override));",
+        "};"
+    )));
+    assert!(mocksmith.wait().success());
+
+    let mut mocksmith = Mocksmith::new_with_options(&["--methods=all"])
+        .source_file(source_file.path())
+        .run();
+    assert_ok!(mocksmith.expect_stdout(&lines!(
+        "class MockSomething : public ISomething",
+        "{",
+        "public:",
+        "  MOCK_METHOD(void, pure_virtual_fun, (), (override));",
+        "  MOCK_METHOD(void, virtual_fun, (), (override));",
+        "  MOCK_METHOD(void, fun, (), ());",
+        "};"
+    )));
+    assert!(mocksmith.wait().success());
+
+    let mut mocksmith = Mocksmith::new_with_options(&["--methods=pure"])
+        .source_file(source_file.path())
+        .run();
+    assert_ok!(mocksmith.expect_stdout(&lines!(
+        "class MockSomething : public ISomething",
+        "{",
+        "public:",
+        "  MOCK_METHOD(void, pure_virtual_fun, (), (override));",
+        "};"
+    )));
+    assert!(mocksmith.wait().success());
+}
+
+#[test]
+fn class_filter_option_affects_which_classes_are_mocked() {
+    let source_file = temp_file_from(&lines!(
+        "class IFoo {",
+        "public:",
+        "  virtual void foo() = 0;",
+        "};",
+        "class IBar {",
+        "public:",
+        "  virtual void bar() = 0;",
+        "};"
+    ));
+
+    let mut mocksmith = Mocksmith::new_with_options(&["--class-filter=Bar"])
+        .source_file(source_file.path())
+        .run();
+    assert_ok!(mocksmith.expect_stdout(&lines!(
+        "class MockBar : public IBar",
+        "{",
+        "public:",
+        "  MOCK_METHOD(void, bar, (), (override));",
+        "};"
+    )));
+    assert!(mocksmith.wait().success());
+}
+
+#[test]
+fn additional_clang_args_are_passed_to_parser() {
+    let source_file = temp_file_from(&lines!(
+        "#ifdef SOMETHING",
+        "class IFoo {",
+        "public:",
+        "  virtual void foo() = 0;",
+        "};",
+        "#endif"
+    ));
+
+    let mut mocksmith = Mocksmith::new().source_file(source_file.path()).run();
+    assert_ok!(mocksmith.expect_stdout(""));
+    assert!(mocksmith.wait().success());
+
+    let mut mocksmith = Mocksmith::new_with_options(&["--clang-arg=-DSOMETHING"])
+        .source_file(source_file.path())
+        .run();
+    assert_ok!(mocksmith.expect_stdout(&lines!(
+        "class MockFoo : public IFoo",
+        "{",
+        "public:",
+        "  MOCK_METHOD(void, foo, (), (override));",
+        "};"
+    )));
+    assert!(mocksmith.wait().success());
+}

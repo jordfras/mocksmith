@@ -15,8 +15,7 @@ fn input_from_stdin_doesnt_work_when_output_to_file_or_dir() {
         "--output-file={}",
         output.path().to_string_lossy()
     )])
-    .run()
-    .stdin(&some_class("ISomething"));
+    .run();
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains("required arguments were not provided"));
     assert!(!mocksmith.wait().success());
@@ -26,8 +25,7 @@ fn input_from_stdin_doesnt_work_when_output_to_file_or_dir() {
         "--output-dir={}",
         output_dir.path().to_string_lossy()
     )])
-    .run()
-    .stdin(&some_class("ISomething"));
+    .run();
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains("required arguments were not provided"));
     assert!(!mocksmith.wait().success());
@@ -106,5 +104,21 @@ fn cant_specify_illegal_cpp_standard() {
     let mut mocksmith = Mocksmith::new_with_options(&["--std=c++99"]).run();
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains("invalid value 'c++99' for '--std <STD>'"));
+    assert!(!mocksmith.wait().success());
+}
+
+#[test]
+fn cant_specify_illegal_method_filter_value() {
+    let mut mocksmith = Mocksmith::new_with_options(&["--methods=unknown"]).run();
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("invalid value 'unknown' for '--methods <METHODS_TO_MOCK>'"));
+    assert!(!mocksmith.wait().success());
+}
+
+#[test]
+fn cant_specify_invalid_class_filter_regex() {
+    let mut mocksmith = Mocksmith::new_with_options(&["--class-filter=("]).run();
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("Invalid regex string: Invalid class filter"));
     assert!(!mocksmith.wait().success());
 }

@@ -6,7 +6,7 @@ use helpers::temp_file_from;
 use mocksmith::{Mocksmith, MocksmithError};
 
 #[test]
-fn simple_pure_virtual_function_can_be_mocked() {
+fn simple_pure_virtual_method_can_be_mocked() {
     let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
           class Foo {
@@ -27,7 +27,7 @@ fn simple_pure_virtual_function_can_be_mocked() {
 }
 
 #[test]
-fn simple_non_virtual_function_is_ignored() {
+fn simple_non_virtual_method_is_ignored() {
     let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
           class Foo {
@@ -150,7 +150,7 @@ fn protected_and_private_methods_are_mocked_as_public() {
           private:
             virtual void fizz() = 0;
           };";
-    // Mocked functions must be public to work with ON_CALL and EXPECT_CALL. See gMock
+    // Mocked methods must be public to work with ON_CALL and EXPECT_CALL. See gMock
     // cookbook.
     assert_mocks!(
         mocksmith.create_mocks_from_string(cpp_class),
@@ -212,7 +212,7 @@ fn unknown_return_type_is_treated_as_error() {
             virtual ~Foo() = default;
             virtual Unknown bar() = 0;
           };";
-    // When a return type is not recognized by libclang, the function is not marked as
+    // When a return type is not recognized by libclang, the method is not marked as
     // virtual. In this case it is then not mocked.
     assert_eq!(
         mocksmith.create_mocks_from_string(cpp_class),
@@ -370,7 +370,7 @@ fn setting_include_path_finds_types_in_headers() {
 }
 
 #[test]
-fn generate_all_functions_mocks_non_virtual_functions() {
+fn generate_all_methods_mocks_non_virtual_methods() {
     let mocksmith = Mocksmith::new_when_available()
         .unwrap()
         .methods_to_mock(mocksmith::MethodsToMockStrategy::All);
@@ -392,7 +392,7 @@ fn generate_all_functions_mocks_non_virtual_functions() {
         )
     );
 
-    // Class with virtual functions is also found and mocked
+    // Class with virtual methods is also found and mocked
     let cpp_class = "
           class Foo {
           public:
@@ -417,12 +417,12 @@ fn generate_all_functions_mocks_non_virtual_functions() {
 }
 
 #[test]
-fn generate_all_virtual_functions_mocks_virtual_functions_only() {
+fn generate_all_virtual_methods_mocks_virtual_methods_only() {
     let mocksmith = Mocksmith::new_when_available()
         .unwrap()
         .methods_to_mock(mocksmith::MethodsToMockStrategy::AllVirtual);
 
-    // Class with only non-virtual functions is ignored
+    // Class with only non-virtual methods is ignored
     let cpp_class = "
           class Foo {
           public:
@@ -430,7 +430,7 @@ fn generate_all_virtual_functions_mocks_virtual_functions_only() {
           };";
     assert_no_mocks!(mocksmith.create_mocks_from_string(cpp_class));
 
-    // Class with virtual functions is also found and virtual functions are mocked
+    // Class with virtual methods is also found and virtual methods are mocked
     let cpp_class = "
           class Foo {
           public:
@@ -454,12 +454,12 @@ fn generate_all_virtual_functions_mocks_virtual_functions_only() {
 }
 
 #[test]
-fn generate_pure_virtual_functions_mocks_pure_virtual_functions_only() {
+fn generate_pure_virtual_methods_mocks_pure_virtual_methods_only() {
     let mocksmith = Mocksmith::new_when_available()
         .unwrap()
         .methods_to_mock(mocksmith::MethodsToMockStrategy::OnlyPureVirtual);
 
-    // Class with non pure virtual functions is ignored
+    // Class with non pure virtual methods is ignored
     let cpp_class = "
           class Foo {
           public:
@@ -468,7 +468,7 @@ fn generate_pure_virtual_functions_mocks_pure_virtual_functions_only() {
           };";
     assert_no_mocks!(mocksmith.create_mocks_from_string(cpp_class));
 
-    // Class with pure virtual functions is found and pure virtual functions are mocked
+    // Class with pure virtual methods is found and pure virtual methods are mocked
     let cpp_class = "
           class Foo {
           public:
@@ -485,6 +485,39 @@ fn generate_pure_virtual_functions_mocks_pure_virtual_functions_only() {
             "{",
             "public:",
             "  MOCK_METHOD(void, buzz, (), (override));",
+            "};"
+        )
+    );
+}
+
+#[test]
+fn class_filter_avoids_mocking_unwanted_class() {
+    let mocksmith = Mocksmith::new_when_available()
+        .unwrap()
+        .class_filter_fun(|class_name| class_name.starts_with("I"));
+    let cpp_classes = "
+          class ISomething {
+          public:
+            virtual ~ISomething() = default;
+            virtual void bar() = 0;
+          };
+          class ConcreteSomething : public ISomething{
+          public:
+            void bar() override {};
+            virtual void other_fun() {};
+          };";
+
+    let mocks = mocksmith
+        .create_mocks_from_string(cpp_classes)
+        .expect("Mocks should be generated");
+    assert_eq!(mocks.len(), 1, "The concrete class should not be mocked");
+    assert_mocks!(
+        Ok::<Vec<mocksmith::Mock>, String>(mocks),
+        lines!(
+            "class MockSomething : public ISomething",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, bar, (), (override));",
             "};"
         )
     );

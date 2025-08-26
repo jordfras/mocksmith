@@ -1,4 +1,5 @@
 use clap::Parser;
+use mocksmith::MethodsToMockStrategy;
 use std::path::PathBuf;
 
 /// Generates mocks for the Google Mock framework (gmock) from C++ header files. If no
@@ -12,13 +13,29 @@ pub(crate) struct Arguments {
     #[arg(short = 'I', long)]
     pub(crate) include_dir: Vec<PathBuf>,
 
+    /// Selects which methofd to mock in a class. Either all virtual methods
+    /// (default), only pure virtual methods or all non-static methods are mocked.
+    /// This also affects which classes to mock, since classes with no matching methods
+    /// are ignored.
+    #[arg(short = 'm', long = "methods", value_parser = ["virtual", "pure", "all"])]
+    pub(crate) methods_to_mock: Option<String>,
+
+    /// A regex to filter classes to mock by name.
+    #[arg(short = 'c', long = "class-filter", value_name = "FILTER")]
+    pub(crate) class_filter: Option<String>,
+
     /// A sed style regex replacement string to convert class names to mock names.
-    #[arg(short = 'n', long = "name-mock")]
+    #[arg(short = 'n', long = "name-mock", value_name = "SED_REPLACEMENT")]
     pub(crate) name_mock_sed_replacement: Option<String>,
 
     /// A sed style regex replacement string to convert input header file names to output
     /// header file names.
-    #[arg(short = 'f', long = "name-output-file", requires = "output_dir")]
+    #[arg(
+        short = 'f',
+        long = "name-output-file",
+        value_name = "SED_REPLACEMENT",
+        requires = "output_dir"
+    )]
     pub(crate) name_output_file_sed_replacement: Option<String>,
 
     /// If set, all generated mocks are written to the specified file. If neither an output
@@ -45,14 +62,18 @@ pub(crate) struct Arguments {
         "gnu++11", "gnu++14", "gnu++17", "gnu++20", "gnu++23", "gnu++2c"])]
     pub(crate) std: Option<String>,
 
+    /// Additional arguments to the clang C++ parser.
+    #[arg(short = 'a', long = "clang-arg", value_name = "ARG")]
+    pub(crate) clang_args: Vec<String>,
+
     /// Adds MSVC compiler pragmas to disable warnings for overriding deprecated methods.
     /// This option can only be used when producing header files.
     #[arg(long, requires = "output")]
     pub(crate) msvc_allow_deprecated: bool,
 
     /// Ignores errors from parsing the C++ code. This may lead to unknown types in
-    /// arguments being referred to as `int`, and entire functions and classes being
-    /// ignored (when the return value of a function is unknown).
+    /// arguments being referred to as `int`, and entire methods and classes being
+    /// ignored (when the return value of a method is unknown).
     #[arg(long)]
     pub(crate) ignore_errors: bool,
 
@@ -84,4 +105,19 @@ pub(crate) fn arguments() -> Arguments {
         std::process::exit(2);
     }
     arguments
+}
+
+impl Arguments {
+    pub(crate) fn methods_to_mock(&self) -> MethodsToMockStrategy {
+        if let Some(ref methods) = self.methods_to_mock {
+            match methods.as_str() {
+                "virtual" => MethodsToMockStrategy::AllVirtual,
+                "pure" => MethodsToMockStrategy::OnlyPureVirtual,
+                "all" => MethodsToMockStrategy::All,
+                _ => MethodsToMockStrategy::AllVirtual,
+            }
+        } else {
+            MethodsToMockStrategy::AllVirtual
+        }
+    }
 }

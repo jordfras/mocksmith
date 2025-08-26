@@ -19,6 +19,7 @@ pub(crate) struct ClangWrap {
     _clang_lock: MutexGuard<'static, ()>,
     ignore_errors: bool,
     cpp_standard: Option<String>,
+    additional_clang_args: Vec<String>,
     parse_function_bodies: bool,
 }
 
@@ -53,6 +54,7 @@ impl ClangWrap {
             clang,
             ignore_errors: false,
             cpp_standard: None,
+            additional_clang_args: Vec::new(),
             parse_function_bodies: false,
         })
     }
@@ -63,6 +65,10 @@ impl ClangWrap {
 
     pub(crate) fn set_cpp_standard(&mut self, standard: Option<String>) {
         self.cpp_standard = standard;
+    }
+
+    pub(crate) fn set_additional_clang_args(&mut self, args: Vec<String>) {
+        self.additional_clang_args = args;
     }
 
     pub(crate) fn set_parse_function_bodies(&mut self, value: bool) {
@@ -169,6 +175,7 @@ impl ClangWrap {
                     .map(|path| format!("-I{}", path.display())),
             );
         }
+        arguments.extend(self.additional_clang_args.iter().cloned());
         arguments
     }
 }
