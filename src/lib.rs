@@ -26,7 +26,7 @@ pub enum MocksmithError {
                 String::new()
             }
             else {
-                format!(" in file {} ", file.as_ref().unwrap().display())
+                format!("in file {} ", file.as_ref().unwrap().display())
             },
             line, column, message)]
     ParseError {
