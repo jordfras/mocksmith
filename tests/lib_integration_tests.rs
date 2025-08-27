@@ -2,7 +2,7 @@ mod assertions;
 #[allow(dead_code)]
 mod helpers;
 
-use helpers::temp_file_from;
+use helpers::{temp_dir, temp_file_from};
 use mocksmith::{Mocksmith, MocksmithError};
 
 #[test]
@@ -221,6 +221,27 @@ fn unknown_return_type_is_treated_as_error() {
             file: None,
             line: 5,
             column: 21
+        })
+    );
+}
+
+#[test]
+fn error_in_included_file_is_reported_in_correct_file() {
+    let dir = temp_dir();
+    let main_header = dir.path().join("header.h");
+    let included_header = dir.path().join("included.h");
+    std::fs::write(&main_header, "#include \"included.h\"\n").unwrap();
+    std::fs::write(&included_header, "static Unknown var;\n").unwrap();
+
+    let mocksmith = Mocksmith::new_when_available().unwrap();
+    assert_eq!(
+        mocksmith.create_mocks_for_file(main_header),
+        Err(MocksmithError::ParseError {
+            message: "unknown type name 'Unknown'".to_string(),
+            // Error in the included file rather than the main file
+            file: Some(included_header.to_path_buf()),
+            line: 1,
+            column: 8
         })
     );
 }

@@ -10,6 +10,9 @@ use std::{
 // cannot be put in a LazyLock<Mutex<>> itself.
 static CLANG_MUTEX: Mutex<()> = Mutex::new(());
 
+// Dummy file name used when parsing strings
+static DUMMY_FILE: &str = "mocksmith_dummy_input_file.h";
+
 // Struct to wrap the Clang library and a mutex guard to ensure only one thread can use it
 // at a time, at least via this library.
 pub(crate) struct ClangWrap {
@@ -88,7 +91,7 @@ impl ClangWrap {
             .skip_function_bodies(!self.parse_function_bodies)
             .parse()
             .expect("Failed to parse translation unit");
-        self.check_diagnostics(Some(file), &tu)?;
+        self.check_diagnostics(&tu)?;
         f(&tu)
     }
 
@@ -100,23 +103,19 @@ impl ClangWrap {
     ) -> crate::Result<T> {
         let index = clang::Index::new(&self.clang, true, false);
         // Use `Unsaved` with dummy file name to be able to parse from a string
-        let unsaved = clang::Unsaved::new(Path::new("nofile.h"), content);
+        let unsaved = clang::Unsaved::new(Path::new(DUMMY_FILE), content);
         let tu = index
-            .parser("nofile.h")
+            .parser(DUMMY_FILE)
             .unsaved(&[unsaved])
             .arguments(&self.clang_arguments(include_paths))
             .skip_function_bodies(!self.parse_function_bodies)
             .parse()
             .expect("Failed to parse translation unit");
-        self.check_diagnostics(None, &tu)?;
+        self.check_diagnostics(&tu)?;
         f(&tu)
     }
 
-    fn check_diagnostics(
-        &self,
-        file: Option<&Path>,
-        tu: &clang::TranslationUnit,
-    ) -> crate::Result<()> {
+    fn check_diagnostics(&self, tu: &clang::TranslationUnit) -> crate::Result<()> {
         let diagnostics = tu.get_diagnostics();
         if self.ignore_errors {
             diagnostics
@@ -141,9 +140,14 @@ impl ClangWrap {
                 .nth(0)
             {
                 let location = diagnostic.get_location().get_file_location();
+                let file_path = location
+                    .file
+                    .map(|file| file.get_path())
+                    // Dummy file means parsing from string, don't report the dummy name
+                    .filter(|path| path != Path::new(DUMMY_FILE));
                 return Err(MocksmithError::ParseError {
                     message: diagnostic.get_text(),
-                    file: file.map(|f| f.to_path_buf()),
+                    file: file_path,
                     line: location.line,
                     column: location.column,
                 });
