@@ -137,7 +137,7 @@ $ mocksmith code/itemcomponent/IMyItem.h
 Error: Could not create mocks for file code/itemcomponent/IMyItem.h
 
 Caused by:
-    Parse error  in file code/itemcomponent/IMyItem.h at line 2, column 10: 'subcomponent/MyEnum.h' file not found
+    Parse error in file code/itemcomponent/IMyItem.h at line 2, column 10: 'subcomponent/MyEnum.h' file not found
 ```
 
 Adding `-I code/` solves this:
