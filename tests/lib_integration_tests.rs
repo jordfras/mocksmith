@@ -167,6 +167,7 @@ fn protected_and_private_methods_are_mocked_as_public() {
 
 #[test]
 fn unknown_argument_type_is_treated_as_error() {
+    //return;
     let mocksmith = Mocksmith::new_when_available().unwrap().ignore_errors(true);
     let cpp_class = "
           class Foo {

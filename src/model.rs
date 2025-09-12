@@ -34,6 +34,7 @@ pub(crate) fn classes_in_translation_unit(
 impl ClassToMock {
     fn from_entity(
         class: &clang::Entity,
+        file_contents: Option<&String>,
         namespaces: &Vec<clang::Entity>,
         methods_to_mock: crate::MethodsToMockStrategy,
     ) -> Self {
@@ -48,14 +49,14 @@ impl ClassToMock {
                 .iter()
                 .filter(|child| child.get_kind() == clang::EntityKind::Method)
                 .filter(|method| methods_to_mock.should_mock(method))
-                .map(|method| MethodToMock::from_entity(method))
+                .map(|method| MethodToMock::from_entity(method, file_contents))
                 .collect(),
         }
     }
 }
 
 impl MethodToMock {
-    fn from_entity(method: &clang::Entity) -> Self {
+    fn from_entity(method: &clang::Entity, file_contents: Option<&String>) -> Self {
         Self {
             name: method.get_name().expect("Method should have a name"),
             result_type: method
@@ -67,7 +68,7 @@ impl MethodToMock {
                 .expect("Method should have arguments")
                 .iter()
                 .map(|arg| Argument {
-                    type_name: Self::get_type(arg),
+                    type_name: Self::get_type(arg, file_contents),
                     name: arg.get_name(),
                 })
                 .collect(),
@@ -84,8 +85,20 @@ impl MethodToMock {
         }
     }
 
-    fn get_type(entity: &clang::Entity) -> String {
-        Self::extract_type_from_source(entity).unwrap_or_else(|| {
+    fn get_type(entity: &clang::Entity, file_contents: Option<&String>) -> String {
+        Self::extract_type_from_source(entity, file_contents).unwrap_or_else(|| {
+            // Fallback to clang's type extraction if source extraction fails
+            if let Some(loc) = entity.get_location()
+                && let Some(file) = loc.get_file_location().file
+                && let Some(contents) = file.get_contents()
+            {
+                println!("**** KNAS: Got contents from entity!!! {:?}", entity);
+                return Self::extract_type_from_source(entity, Some(&contents)).unwrap();
+            }
+            println!(
+                "**** Warning: Falling back to clang type extraction for entity {:?}",
+                entity
+            );
             entity
                 .get_type()
                 .expect("Entity should have a type")
@@ -93,25 +106,24 @@ impl MethodToMock {
         })
     }
 
-    fn extract_type_from_source(entity: &clang::Entity) -> Option<String> {
-        if let Some(range) = entity.get_range() {
-            // TODO: Don't get source code every time!
-            if let Some(loc) = entity.get_location()
-                && let Some(file) = loc.get_file_location().file
-                && let Some(contents) = file.get_contents()
-            {
-                let start = range.get_start().get_file_location().offset as usize;
-                let mut end = range.get_end().get_file_location().offset as usize;
-                if let Some(name) = entity.get_name() {
-                    end -= name.len();
-                }
-
-                if start >= end || end > contents.len() {
-                    // TODO: warn, sanity check
-                    return None;
-                }
-                return Some(contents[start..end].trim().to_string());
+    fn extract_type_from_source(
+        entity: &clang::Entity,
+        file_contents: Option<&String>,
+    ) -> Option<String> {
+        if let Some(range) = entity.get_range()
+            && let Some(file_contents) = file_contents
+        {
+            let start = range.get_start().get_file_location().offset as usize;
+            let mut end = range.get_end().get_file_location().offset as usize;
+            if let Some(name) = entity.get_name() {
+                end -= name.len();
             }
+
+            if start >= end || end > file_contents.len() {
+                // TODO: warn, sanity check
+                return None;
+            }
+            return Some(file_contents[start..end].trim().to_string());
         }
         None
     }
@@ -119,6 +131,7 @@ impl MethodToMock {
 
 struct AstTraverser<'a> {
     root: clang::Entity<'a>,
+    file_contents: Option<String>,
     methods_to_mock: crate::MethodsToMockStrategy,
 
     classes: Vec<ClassToMock>,
@@ -130,8 +143,23 @@ impl<'a> AstTraverser<'a> {
         root: &'a clang::TranslationUnit<'a>,
         methods_to_mock: crate::MethodsToMockStrategy,
     ) -> Self {
+        let file_contents = if let Some(loc) = root
+            .get_entity()
+            .get_children()
+            .first()
+            .map(|child| child.get_location())
+            .flatten()
+            && let Some(file) = loc.get_file_location().file
+        {
+            file.get_contents()
+        } else {
+            println!("**********NO FILE CONTENTS");
+            None
+        };
+        println!("**********FILE CONTENTS: {:?}", file_contents);
         Self {
             root: root.get_entity(),
+            file_contents,
             methods_to_mock,
             classes: Vec::new(),
             namespace_stack: Vec::new(),
@@ -149,6 +177,7 @@ impl<'a> AstTraverser<'a> {
                 if entity.is_definition() && self.should_mock_class(&entity) {
                     self.classes.push(ClassToMock::from_entity(
                         &entity,
+                        self.file_contents.as_ref(),
                         &self.namespace_stack,
                         self.methods_to_mock,
                     ));
