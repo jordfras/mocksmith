@@ -67,10 +67,7 @@ impl MethodToMock {
                 .expect("Method should have arguments")
                 .iter()
                 .map(|arg| Argument {
-                    type_name: arg
-                        .get_type()
-                        .expect("Argument should have a type")
-                        .get_display_name(),
+                    type_name: Self::get_type(arg),
                     name: arg.get_name(),
                 })
                 .collect(),
@@ -85,6 +82,38 @@ impl MethodToMock {
                 },
             ),
         }
+    }
+
+    fn get_type(entity: &clang::Entity) -> String {
+        Self::extract_type_from_source(entity).unwrap_or_else(|| {
+            entity
+                .get_type()
+                .expect("Entity should have a type")
+                .get_display_name()
+        })
+    }
+
+    fn extract_type_from_source(entity: &clang::Entity) -> Option<String> {
+        if let Some(range) = entity.get_range() {
+            // TODO: Don't get source code every time!
+            if let Some(loc) = entity.get_location()
+                && let Some(file) = loc.get_file_location().file
+                && let Some(contents) = file.get_contents()
+            {
+                let start = range.get_start().get_file_location().offset as usize;
+                let mut end = range.get_end().get_file_location().offset as usize;
+                if let Some(name) = entity.get_name() {
+                    end -= name.len();
+                }
+
+                if start >= end || end > contents.len() {
+                    // TODO: warn, sanity check
+                    return None;
+                }
+                return Some(contents[start..end].trim().to_string());
+            }
+        }
+        None
     }
 }
 

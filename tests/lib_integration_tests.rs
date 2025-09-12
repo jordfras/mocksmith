@@ -55,7 +55,7 @@ fn various_return_types_and_argument_types_can_be_mocked() {
             "class MockFoo : public Foo",
             "{",
             "public:",
-            "  MOCK_METHOD(std::string, bar, (const std::string & arg1, const char * arg2), (override));",
+            "  MOCK_METHOD(std::string, bar, (const std::string& arg1, const char* arg2), (override));",
             "  MOCK_METHOD(uint32_t, fizz, (uint32_t arg1, uint64_t arg2, int32_t arg3, int64_t arg4), (override));",
             "};"
         )
@@ -128,7 +128,7 @@ fn types_with_commas_are_wrapped_with_parenthesis() {
             "class MockFoo : public Foo",
             "{",
             "public:",
-            "  MOCK_METHOD((std::map<int, int>), bar, ((const std::map<int, int> & arg)), (override));",
+            "  MOCK_METHOD((std::map<int, int>), bar, ((const std::map<int, int>& arg)), (override));",
             "};"
         )
     );
