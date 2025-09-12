@@ -167,15 +167,16 @@ fn protected_and_private_methods_are_mocked_as_public() {
 
 #[test]
 fn unknown_argument_type_is_treated_as_error() {
-    let mocksmith = Mocksmith::new_when_available().unwrap();
+    let mocksmith = Mocksmith::new_when_available().unwrap().ignore_errors(true);
     let cpp_class = "
           class Foo {
           public:
             virtual ~Foo() = default;
             virtual void bar(const Unknown& arg) = 0;
           };";
+
     // When an argument type is not recognized by libclang, it is assumed to be an int.
-    assert_eq!(
+    /*assert_eq!(
         mocksmith.create_mocks_from_string(cpp_class),
         Err(MocksmithError::ParseError {
             message: "unknown type name 'Unknown'".to_string(),
@@ -183,9 +184,15 @@ fn unknown_argument_type_is_treated_as_error() {
             line: 5,
             column: 36
         })
-    );
+    );*/
 
-    let cpp_class = "
+    let mocks = mocksmith.create_mocks_from_string(cpp_class).unwrap();
+    for mock in mocks {
+        println!("Mock: {}", mock.code);
+    }
+    assert!(false);
+
+    /*let cpp_class = "
           class Foo {
           public:
             virtual ~Foo() = default;
@@ -200,7 +207,7 @@ fn unknown_argument_type_is_treated_as_error() {
             line: 6,
             column: 37
         })
-    );
+    );*/
 }
 
 #[test]
