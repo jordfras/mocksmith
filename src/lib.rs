@@ -285,7 +285,8 @@ impl Mocksmith {
     }
 
     fn create_mocks(&self, tu: &clang::TranslationUnit) -> Result<Vec<Mock>> {
-        let classes = model::classes_in_translation_unit(tu, self.methods_to_mock);
+        let classes =
+            model::classes_in_translation_unit(Rc::clone(&self.log), tu, self.methods_to_mock);
         Ok(classes
             .iter()
             .filter(|class| (self.filter_class)(class.name.as_str()))

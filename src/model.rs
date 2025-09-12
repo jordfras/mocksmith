@@ -1,3 +1,6 @@
+use crate::log;
+use std::rc::Rc;
+
 // Represents a class that shall be mocked
 #[derive(Debug)]
 pub(crate) struct ClassToMock {
@@ -6,6 +9,7 @@ pub(crate) struct ClassToMock {
     pub(crate) methods: Vec<MethodToMock>,
 }
 
+// Represents a class method that shall be mocked
 #[derive(Debug)]
 pub(crate) struct MethodToMock {
     pub(crate) name: String,
@@ -17,6 +21,7 @@ pub(crate) struct MethodToMock {
     pub(crate) ref_qualifier: Option<String>,
 }
 
+// Represents a method argument
 #[derive(Debug)]
 pub(crate) struct Argument {
     pub(crate) type_name: String,
@@ -25,19 +30,34 @@ pub(crate) struct Argument {
 
 // Finds classes to mock in the main file of a translation unit
 pub(crate) fn classes_in_translation_unit(
+    log: Rc<Option<log::Logger>>,
     root: &clang::TranslationUnit,
     methods_to_mock: crate::MethodsToMockStrategy,
 ) -> Vec<ClassToMock> {
-    AstTraverser::new(root, methods_to_mock).traverse()
+    AstTraverser::new(log, root, methods_to_mock).traverse()
 }
 
-impl ClassToMock {
-    fn from_entity(
+// Factory for creating model objects from clang entities
+struct ModelFactory {
+    log: Rc<Option<log::Logger>>,
+    file_contents: Option<String>,
+}
+
+impl ModelFactory {
+    fn new(log: Rc<Option<log::Logger>>) -> Self {
+        Self {
+            log,
+            file_contents: None,
+        }
+    }
+
+    fn class_from_entity(
+        &mut self,
         class: &clang::Entity,
         namespaces: &Vec<clang::Entity>,
         methods_to_mock: crate::MethodsToMockStrategy,
-    ) -> Self {
-        Self {
+    ) -> ClassToMock {
+        ClassToMock {
             name: class.get_name().expect("Class should have a name"),
             namespaces: namespaces
                 .iter()
@@ -48,15 +68,13 @@ impl ClassToMock {
                 .iter()
                 .filter(|child| child.get_kind() == clang::EntityKind::Method)
                 .filter(|method| methods_to_mock.should_mock(method))
-                .map(|method| MethodToMock::from_entity(method))
+                .map(|method| self.method_from_entity(method))
                 .collect(),
         }
     }
-}
 
-impl MethodToMock {
-    fn from_entity(method: &clang::Entity) -> Self {
-        Self {
+    fn method_from_entity(&mut self, method: &clang::Entity) -> MethodToMock {
+        MethodToMock {
             name: method.get_name().expect("Method should have a name"),
             result_type: method
                 .get_result_type()
@@ -67,7 +85,7 @@ impl MethodToMock {
                 .expect("Method should have arguments")
                 .iter()
                 .map(|arg| Argument {
-                    type_name: Self::get_type(arg),
+                    type_name: self.get_type(arg),
                     name: arg.get_name(),
                 })
                 .collect(),
@@ -84,8 +102,8 @@ impl MethodToMock {
         }
     }
 
-    fn get_type(entity: &clang::Entity) -> String {
-        Self::extract_type_from_source(entity).unwrap_or_else(|| {
+    fn get_type(&mut self, entity: &clang::Entity) -> String {
+        self.extract_type_from_source(entity).unwrap_or_else(|| {
             entity
                 .get_type()
                 .expect("Entity should have a type")
@@ -93,32 +111,53 @@ impl MethodToMock {
         })
     }
 
-    fn extract_type_from_source(entity: &clang::Entity) -> Option<String> {
+    fn extract_type_from_source(&mut self, entity: &clang::Entity) -> Option<String> {
         if let Some(range) = entity.get_range() {
-            // TODO: Don't get source code every time!
-            if let Some(loc) = entity.get_location()
-                && let Some(file) = loc.get_file_location().file
-                && let Some(contents) = file.get_contents()
-            {
+            self.cache_file_contents(entity);
+
+            if let Some(file_contents) = &self.file_contents {
                 let start = range.get_start().get_file_location().offset as usize;
                 let mut end = range.get_end().get_file_location().offset as usize;
                 if let Some(name) = entity.get_name() {
                     end -= name.len();
                 }
 
-                if start >= end || end > contents.len() {
-                    // TODO: warn, sanity check
+                if start >= end || end > file_contents.len() {
+                    log!(
+                        self.log,
+                        "Falling back to clang type extraction for entity {:?} \
+                         due to illegal file position",
+                        entity
+                    );
                     return None;
                 }
-                return Some(contents[start..end].trim().to_string());
+                return Some(file_contents[start..end].trim().to_string());
             }
         }
+        log!(
+            self.log,
+            "Falling back to clang type extraction for entity {:?} \
+             due to missing range or file contents",
+            entity
+        );
         None
+    }
+
+    fn cache_file_contents(&mut self, entity: &clang::Entity) {
+        if self.file_contents.is_none() {
+            if let Some(location) = entity.get_location()
+                && let Some(file) = location.get_file_location().file
+            {
+                self.file_contents = file.get_contents();
+            }
+        }
     }
 }
 
+// Traverses the AST to find classes to mock
 struct AstTraverser<'a> {
     root: clang::Entity<'a>,
+    factory: ModelFactory,
     methods_to_mock: crate::MethodsToMockStrategy,
 
     classes: Vec<ClassToMock>,
@@ -127,11 +166,13 @@ struct AstTraverser<'a> {
 
 impl<'a> AstTraverser<'a> {
     pub fn new(
+        log: Rc<Option<log::Logger>>,
         root: &'a clang::TranslationUnit<'a>,
         methods_to_mock: crate::MethodsToMockStrategy,
     ) -> Self {
         Self {
             root: root.get_entity(),
+            factory: ModelFactory::new(log),
             methods_to_mock,
             classes: Vec::new(),
             namespace_stack: Vec::new(),
@@ -147,7 +188,7 @@ impl<'a> AstTraverser<'a> {
         match entity.get_kind() {
             clang::EntityKind::ClassDecl => {
                 if entity.is_definition() && self.should_mock_class(&entity) {
-                    self.classes.push(ClassToMock::from_entity(
+                    self.classes.push(self.factory.class_from_entity(
                         &entity,
                         &self.namespace_stack,
                         self.methods_to_mock,
