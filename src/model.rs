@@ -101,15 +101,16 @@ impl MethodToMock {
                 && let Some(contents) = file.get_contents()
             {
                 let start = range.get_start().get_file_location().offset as usize;
+                let mut end = range.get_end().get_file_location().offset as usize;
+                if let Some(name) = entity.get_name() {
+                    end -= name.len();
+                }
 
-                let end = range.get_end().get_file_location().offset as usize;
-
-                let type_name = &contents[start..end];
-                println!("type: {}", type_name);
-
-                println!("name: {:?}", entity.get_name());
-
-                return Some(contents[start..end].to_string());
+                if start >= end || end > contents.len() {
+                    // TODO: warn, sanity check
+                    return None;
+                }
+                return Some(contents[start..end].trim().to_string());
             }
         }
         None
