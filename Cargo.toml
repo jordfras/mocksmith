@@ -36,4 +36,4 @@ clang = { version="2.0", features=["clang_5_0"] }
 
 [dev-dependencies]
 cargo_metadata = "0.22"
-tempfile = { version="3.22", default-features=false }
+tempfile = { version="3.23", default-features=false }
