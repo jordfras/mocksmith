@@ -19,7 +19,7 @@ capitalize = "0.3"
 clap = { version="4.5", features=["derive", "wrap_help"] }
 dunce = "1.0"
 pathdiff = "0.2"
-regex = { version="1.11", default-features=false, features=["std"] }
+regex = { version="1.12", default-features=false, features=["std"] }
 thiserror = "2.0"
 
 # Use runtime feature to load libclang at runtime. This makes it possible to build without
