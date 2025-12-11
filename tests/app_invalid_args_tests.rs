@@ -69,21 +69,6 @@ fn cant_specify_both_output_file_and_dir() {
 }
 
 #[test]
-fn cant_specify_nonexisting_dir() {
-    let source_file = temp_file_from(&some_class("ISomething"));
-
-    let mut mocksmith =
-        Mocksmith::new_with_options(&["--output-dir=path_to_a_directory_that_does_not_exist"])
-            .source_file(source_file.path())
-            .run();
-    let stderr = mocksmith.read_stderr().unwrap();
-    assert!(stderr.contains(
-        "Failed to write mock header file path_to_a_directory_that_does_not_exist" //...
-    ));
-    assert!(!mocksmith.wait().success());
-}
-
-#[test]
 fn cant_allow_deprecated_when_not_generating_header() {
     let mut mocksmith = Mocksmith::new_with_options(&["--msvc-allow-deprecated"]).run();
     let stderr = mocksmith.read_stderr().unwrap();
@@ -120,5 +105,13 @@ fn cant_specify_invalid_class_filter_regex() {
     let mut mocksmith = Mocksmith::new_with_options(&["--class-filter=("]).run();
     let stderr = mocksmith.read_stderr().unwrap();
     assert!(stderr.contains("Invalid regex string: Invalid class filter"));
+    assert!(!mocksmith.wait().success());
+}
+
+#[test]
+fn cant_specify_nonexistent_input_file() {
+    let mut mocksmith = Mocksmith::new_with_options(&["nonexistent_file.h"]).run();
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("Input header file does not exist or is not a file"));
     assert!(!mocksmith.wait().success());
 }

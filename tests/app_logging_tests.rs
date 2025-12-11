@@ -19,6 +19,7 @@ fn warning_is_logged_with_verbose() {
     // Warning logged to stderr
     assert!(stderr.contains("warning"));
     assert!(stderr.contains("does not return a value"));
+    assert!(!mocksmith.read_stdout().unwrap().contains("class"));
     assert!(mocksmith.wait().success());
 }
 
@@ -28,9 +29,9 @@ fn warning_is_not_logged_without_verbose() {
     let mut mocksmith = Mocksmith::new_with_options(&["--parse-function-bodies"])
         .source_file(source_file.path())
         .run();
-    let stderr = mocksmith.read_stderr().unwrap();
     // No warning logged to stderr, even though clang diagnostics contains a warning
-    assert!(!stderr.contains("warning"));
+    assert!(!mocksmith.read_stderr().unwrap().contains("warning"));
+    assert!(!mocksmith.read_stdout().unwrap().contains("class"));
     assert!(mocksmith.wait().success());
 }
 

@@ -19,6 +19,14 @@ fn maybe_write_file(file: &Path, content: &str, always_write: bool) -> anyhow::R
     Ok(())
 }
 
+fn maybe_create_dir(path: &Path) -> anyhow::Result<()> {
+    if !path.exists() {
+        std::fs::create_dir_all(path)
+            .with_context(|| format!("Could not create output directory {}", path.display()))?;
+    }
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
     let arguments = arguments();
 
@@ -120,6 +128,9 @@ fn main() -> anyhow::Result<()> {
             })
             .collect::<anyhow::Result<Vec<MockHeader>>>()?;
         let output_dir = arguments.output_dir.unwrap();
+        if !arguments.no_create_output_dir {
+            maybe_create_dir(output_dir.as_path())?;
+        }
         headers.into_iter().try_for_each(|header| {
             if !header.mocks.is_empty() {
                 let output_file = output_dir.join(name_output_file(&header));
@@ -130,15 +141,8 @@ fn main() -> anyhow::Result<()> {
             }
         })?;
     } else {
-        for header in arguments.source_files {
-            mocksmith
-                .create_mocks_for_file(header.as_path())
-                .with_context(|| format!("Could not create mocks for file {}", header.display()))?
-                .into_iter()
-                .for_each(|mock| {
-                    print!("{}", mock.code);
-                });
-        }
+        let header = mocksmith.create_mock_header_for_files(&arguments.source_files)?;
+        print!("{}", header.code);
     }
 
     Ok(())

@@ -21,6 +21,8 @@ pub enum MocksmithError {
     InvalidSedReplacement(String),
     #[error("Invalid regex string: {0}")]
     InvalidRegex(String),
+    #[error("Input header file does not exist or is not a file: {0}")]
+    InputFileError(PathBuf),
     #[error("Parse error {}at line {}, column {}: {}",
             if file.is_none() {
                 String::new()
@@ -225,6 +227,9 @@ impl Mocksmith {
     where
         P: AsRef<Path>,
     {
+        if !file.as_ref().is_file() {
+            return Err(MocksmithError::InputFileError(file.as_ref().to_path_buf()));
+        }
         self.clangwrap
             .with_tu_from_file(&self.include_paths, file.as_ref(), |tu| {
                 let mut mocks = self.create_mocks(tu)?;

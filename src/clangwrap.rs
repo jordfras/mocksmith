@@ -90,7 +90,12 @@ impl ClangWrap {
             .arguments(&self.clang_arguments(include_paths))
             .skip_function_bodies(!self.parse_function_bodies)
             .parse()
-            .expect("Failed to parse translation unit");
+            .map_err(|e| MocksmithError::ParseError {
+                message: e.to_string(),
+                file: Some(file.to_path_buf()),
+                line: 0,
+                column: 0,
+            })?;
         self.check_diagnostics(&tu)?;
         f(&tu)
     }
@@ -110,7 +115,12 @@ impl ClangWrap {
             .arguments(&self.clang_arguments(include_paths))
             .skip_function_bodies(!self.parse_function_bodies)
             .parse()
-            .expect("Failed to parse translation unit");
+            .map_err(|e| MocksmithError::ParseError {
+                message: e.to_string(),
+                file: None,
+                line: 0,
+                column: 0,
+            })?;
         self.check_diagnostics(&tu)?;
         f(&tu)
     }

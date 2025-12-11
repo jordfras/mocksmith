@@ -47,9 +47,14 @@ pub(crate) struct Arguments {
     /// If set, all generated mocks are written to files in the specified directory.
     /// Files are named after the source class header file. If neither an output
     /// file nor directory is specified, the mocks are printed to stdout. Input from stdin
-    /// always generates output to stdout.
+    /// always generates output to stdout. If the directory does not exist, it is created,
+    /// unless --no-create-output-dir is specified.
     #[arg(short = 'd', long, group = "output", requires = "source_files")]
     pub(crate) output_dir: Option<PathBuf>,
+
+    /// Don't create the output directory if it does not exist.
+    #[arg(long, requires = "output_dir")]
+    pub(crate) no_create_output_dir: bool,
 
     /// Forces writing output files without checking if the content has changed.
     #[arg(short = 'w', long)]
