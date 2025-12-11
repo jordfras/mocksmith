@@ -107,3 +107,11 @@ fn cant_specify_invalid_class_filter_regex() {
     assert!(stderr.contains("Invalid regex string: Invalid class filter"));
     assert!(!mocksmith.wait().success());
 }
+
+#[test]
+fn cant_specify_nonexistent_input_file() {
+    let mut mocksmith = Mocksmith::new_with_options(&["nonexistent_file.h"]).run();
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("Input header file does not exist or is not a file"));
+    assert!(!mocksmith.wait().success());
+}

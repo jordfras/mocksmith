@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Proper error instead of panic, if specifying an input header file that doesn't exist.
+
 ### Changed
 - If an output directory is specfied, it is recursively created, if it does not exist.
   This can be avoided with --no-create-output-dir.
