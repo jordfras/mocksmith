@@ -78,6 +78,24 @@ fn input_from_file_produces_complete_header_when_output_to_dir() {
 }
 
 #[test]
+fn output_dir_is_created_if_it_does_not_exist() {
+    let source_file = temp_file_from(&some_class("ISomething"));
+    let temp_dir = temp_dir();
+    let output_dir = temp_dir.path().join("non_existing_dir");
+
+    assert!(
+        Mocksmith::new_with_options(&[&format!("--output-dir={}", output_dir.to_string_lossy())])
+            .source_file(source_file.path())
+            .run()
+            .wait()
+            .success()
+    );
+    let header =
+        std::fs::read_to_string(output_dir.join("MockSomething.h")).expect("Mock file not found");
+    assert!(header.contains("class MockSomething"));
+}
+
+#[test]
 fn multiple_classes_in_file_produce_single_header_when_output_to_file() {
     let source_file = temp_file_from(&format!(
         "{}\n\n{}",
