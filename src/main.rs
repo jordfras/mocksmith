@@ -141,15 +141,8 @@ fn main() -> anyhow::Result<()> {
             }
         })?;
     } else {
-        for header in arguments.source_files {
-            mocksmith
-                .create_mocks_for_file(header.as_path())
-                .with_context(|| format!("Could not create mocks for file {}", header.display()))?
-                .into_iter()
-                .for_each(|mock| {
-                    print!("{}", mock.code);
-                });
-        }
+        let header = mocksmith.create_mock_header_for_files(&arguments.source_files)?;
+        print!("{}", header.code);
     }
 
     Ok(())

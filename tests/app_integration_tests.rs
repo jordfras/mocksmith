@@ -18,11 +18,17 @@ fn input_from_stdin_produces_mock_only() {
 }
 
 #[test]
-fn input_from_file_produces_mock_only_when_output_to_stdout() {
+fn input_from_file_produces_complete_header_when_output_to_stdout() {
     let source_file = temp_file_from(&some_class("ISomething"));
 
     let mut mocksmith = Mocksmith::new().source_file(source_file.path()).run();
-    assert_ok!(mocksmith.expect_stdout(&some_mock("ISomething", "MockSomething")));
+    assert_matches!(
+        mocksmith.read_stdout().unwrap(),
+        &header_pattern(
+            &[source_file.path()],
+            &[some_mock("ISomething", "MockSomething")]
+        )
+    );
     assert!(mocksmith.wait().success());
 }
 
@@ -384,6 +390,7 @@ fn cpp_standard_affects_parsing() {
     let mut mocksmith = Mocksmith::new_with_options(&["--std=c++14"])
         .source_file(source_file.path())
         .run();
+    assert!(!mocksmith.read_stdout().unwrap().contains("class"));
     assert!(mocksmith.wait().success());
 }
 
@@ -400,7 +407,7 @@ fn cpp_standard_affects_namespace_nesting() {
     let mut mocksmith = Mocksmith::new_with_options(&["--std=c++11"])
         .source_file(source_file.path())
         .run();
-    assert_ok!(mocksmith.expect_stdout(&format!(
+    assert!(mocksmith.read_stdout().unwrap().contains(&format!(
         "namespace A {{ namespace B {{\n{}}}}}\n",
         &some_mock("ISomething", "MockSomething")
     )));
@@ -409,7 +416,7 @@ fn cpp_standard_affects_namespace_nesting() {
     let mut mocksmith = Mocksmith::new_with_options(&["--std=c++17"])
         .source_file(source_file.path())
         .run();
-    assert_ok!(mocksmith.expect_stdout(&format!(
+    assert!(mocksmith.read_stdout().unwrap().contains(&format!(
         "namespace A::B {{\n{}}}\n",
         &some_mock("ISomething", "MockSomething")
     )));
@@ -429,7 +436,7 @@ fn method_filter_option_affects_which_methods_are_mocked() {
     ));
 
     let mut mocksmith = Mocksmith::new().source_file(source_file.path()).run();
-    assert_ok!(mocksmith.expect_stdout(&lines!(
+    assert!(mocksmith.read_stdout().unwrap().contains(&lines!(
         "class MockSomething : public ISomething",
         "{",
         "public:",
@@ -442,7 +449,7 @@ fn method_filter_option_affects_which_methods_are_mocked() {
     let mut mocksmith = Mocksmith::new_with_options(&["--methods=virtual"])
         .source_file(source_file.path())
         .run();
-    assert_ok!(mocksmith.expect_stdout(&lines!(
+    assert!(mocksmith.read_stdout().unwrap().contains(&lines!(
         "class MockSomething : public ISomething",
         "{",
         "public:",
@@ -455,7 +462,7 @@ fn method_filter_option_affects_which_methods_are_mocked() {
     let mut mocksmith = Mocksmith::new_with_options(&["--methods=all"])
         .source_file(source_file.path())
         .run();
-    assert_ok!(mocksmith.expect_stdout(&lines!(
+    assert!(mocksmith.read_stdout().unwrap().contains(&lines!(
         "class MockSomething : public ISomething",
         "{",
         "public:",
@@ -469,7 +476,7 @@ fn method_filter_option_affects_which_methods_are_mocked() {
     let mut mocksmith = Mocksmith::new_with_options(&["--methods=pure"])
         .source_file(source_file.path())
         .run();
-    assert_ok!(mocksmith.expect_stdout(&lines!(
+    assert!(mocksmith.read_stdout().unwrap().contains(&lines!(
         "class MockSomething : public ISomething",
         "{",
         "public:",
@@ -495,7 +502,7 @@ fn class_filter_option_affects_which_classes_are_mocked() {
     let mut mocksmith = Mocksmith::new_with_options(&["--class-filter=Bar"])
         .source_file(source_file.path())
         .run();
-    assert_ok!(mocksmith.expect_stdout(&lines!(
+    assert!(mocksmith.read_stdout().unwrap().contains(&lines!(
         "class MockBar : public IBar",
         "{",
         "public:",
@@ -517,13 +524,13 @@ fn additional_clang_args_are_passed_to_parser() {
     ));
 
     let mut mocksmith = Mocksmith::new().source_file(source_file.path()).run();
-    assert_ok!(mocksmith.expect_stdout(""));
+    assert!(!mocksmith.read_stdout().unwrap().contains("Foo"));
     assert!(mocksmith.wait().success());
 
     let mut mocksmith = Mocksmith::new_with_options(&["--clang-arg=-DSOMETHING"])
         .source_file(source_file.path())
         .run();
-    assert_ok!(mocksmith.expect_stdout(&lines!(
+    assert!(mocksmith.read_stdout().unwrap().contains(&lines!(
         "class MockFoo : public IFoo",
         "{",
         "public:",
