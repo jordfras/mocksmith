@@ -61,7 +61,7 @@ pub(crate) struct Arguments {
     pub(crate) always_write: bool,
 
     /// The C++ standard to use when parsing the source header files. Modern Google Mock
-    /// version require at least C++11, so this is the oldest supported version.
+    /// versions require at least C++11, so this is the oldest supported version.
     #[arg(long, value_parser = [
         "c++11", "c++14", "c++17", "c++20", "c++23", "c++2c",
         "gnu++11", "gnu++14", "gnu++17", "gnu++20", "gnu++23", "gnu++2c"])]
@@ -105,9 +105,15 @@ pub(crate) fn arguments() -> Arguments {
     let arguments = Arguments::parse();
     // For some reason 'requires = "output_dir"' does not seem to work. Perhaps because
     // it is in a group.
-    if arguments.name_output_file_sed_replacement.is_some() && arguments.output_dir.is_none() {
-        eprintln!("The argument --output-dir is required when --name-output-file is used");
-        std::process::exit(2);
+    if arguments.output_dir.is_none() {
+        if arguments.name_output_file_sed_replacement.is_some() {
+            eprintln!("The argument --output-dir is required when --name-output-file is used");
+            std::process::exit(2);
+        }
+        if arguments.no_create_output_dir {
+            eprintln!("The argument --output-dir is required when --no-create-output-dir is used");
+            std::process::exit(2);
+        }
     }
     arguments
 }
