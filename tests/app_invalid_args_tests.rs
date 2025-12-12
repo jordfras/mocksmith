@@ -48,6 +48,22 @@ fn files_cant_be_named_with_sed_style_regex_when_output_to_file() {
 }
 
 #[test]
+fn no_create_output_dir_cant_be_used_when_output_to_file() {
+    let source_file = temp_file_from(&some_class("ISomething"));
+    let output = temp_file();
+
+    let mut mocksmith = Mocksmith::new_with_options(&[
+        &format!("--output-file={}", output.path().to_string_lossy()),
+        r"--no-create-output-dir",
+    ])
+    .source_file(source_file.path())
+    .run();
+    let stderr = mocksmith.read_stderr().unwrap();
+    assert!(stderr.contains("--output-dir is required"));
+    assert!(!mocksmith.wait().success());
+}
+
+#[test]
 fn cant_specify_both_output_file_and_dir() {
     let source_file = temp_file_from(&some_class("ISomething"));
     let output = temp_file();
