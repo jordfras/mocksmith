@@ -200,6 +200,45 @@ fn unknown_argument_type_is_treated_as_error() {
 }
 
 #[test]
+fn unknown_argument_can_be_handled_if_ignoring_errors() {
+    let mocksmith = Mocksmith::new_when_available().unwrap().ignore_errors(true);
+    let cpp_class = "
+          class Foo {
+          public:
+            virtual ~Foo() = default;
+            virtual void bar(const Unknown& arg) = 0;
+          };";
+    assert_mocks!(
+        mocksmith.create_mocks_from_string(cpp_class),
+        lines!(
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, bar, (const Unknown& arg), (override));",
+            "};"
+        )
+    );
+
+    let cpp_class = "
+          class Foo {
+          public:
+            virtual ~Foo() = default;
+            // Include of <string> is missing
+            virtual void fizz(const std::string& arg) = 0;
+          };";
+    assert_mocks!(
+        mocksmith.create_mocks_from_string(cpp_class),
+        lines!(
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(void, fizz, (const std::string& arg), (override));",
+            "};"
+        )
+    );
+}
+
+#[test]
 fn unknown_return_type_is_treated_as_error() {
     let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
@@ -218,6 +257,50 @@ fn unknown_return_type_is_treated_as_error() {
             line: 5,
             column: 21
         })
+    );
+}
+
+#[test]
+fn unknown_return_type_can_be_handled_if_ignoring_errors() {
+    let mocksmith = Mocksmith::new_when_available().unwrap().ignore_errors(true);
+    let cpp_class = "
+          class Foo {
+          public:
+            virtual ~Foo() = default;
+            virtual SomeReturnType bar() = 0;
+          };";
+    assert_mocks!(
+        mocksmith.create_mocks_from_string(cpp_class),
+        lines!(
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(Unknown, bar, (), (override));",
+            "};"
+        )
+    );
+}
+
+#[test]
+fn unknown_types_in_file_can_be_handled_if_ignoring_errors() {
+    let file = temp_file_from(
+        "
+        class Foo {
+        public:
+          virtual ~Foo() = default;
+          virtual SomeReturnType bar(const SomeArgType& arg) = 0;
+        };",
+    );
+    let mocksmith = Mocksmith::new_when_available().unwrap().ignore_errors(true);
+    assert_mocks!(
+        mocksmith.create_mocks_for_file(file.path()),
+        lines!(
+            "class MockFoo : public Foo",
+            "{",
+            "public:",
+            "  MOCK_METHOD(SomeReturnType, bar, (const SomeArgType& arg), (override));",
+            "};"
+        )
     );
 }
 
