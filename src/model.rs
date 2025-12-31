@@ -144,12 +144,11 @@ impl ModelFactory {
     }
 
     fn cache_file_contents(&mut self, entity: &clang::Entity) {
-        if self.file_contents.is_none() {
-            if let Some(location) = entity.get_location()
-                && let Some(file) = location.get_file_location().file
-            {
-                self.file_contents = file.get_contents();
-            }
+        if self.file_contents.is_none()
+            && let Some(location) = entity.get_location()
+            && let Some(file) = location.get_file_location().file
+        {
+            self.file_contents = file.get_contents();
         }
     }
 }
