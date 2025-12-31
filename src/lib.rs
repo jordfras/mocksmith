@@ -7,7 +7,10 @@ pub mod naming;
 
 use clangwrap::ClangWrap;
 use headerpath::header_include_path;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum MocksmithError {
@@ -87,6 +90,7 @@ impl crate::MockHeader {
 
 /// Mocksmith is a struct for generating Google Mock mocks for C++ classes.
 pub struct Mocksmith {
+    log: Rc<Option<log::Logger>>,
     clangwrap: ClangWrap,
     generator: generate::Generator,
 
@@ -102,8 +106,8 @@ impl Mocksmith {
     /// The function fails if another thread already holds an instance, since Clang can
     /// only be used from one thread.
     pub fn new(log_write: Option<Box<dyn std::io::Write>>, verbose: bool) -> Result<Self> {
-        let log = log_write.map(|write| log::Logger::new(write, verbose));
-        Self::create(ClangWrap::new(log)?)
+        let log = Rc::new(log_write.map(|write| log::Logger::new(write, verbose)));
+        Self::create(Rc::clone(&log), ClangWrap::new(log)?)
     }
 
     /// Creates a new Mocksmith instance.
@@ -117,12 +121,13 @@ impl Mocksmith {
             ClangWrap::clear_poison();
             clangwrap = ClangWrap::blocking_new();
         }
-        Self::create(clangwrap?)
+        Self::create(Rc::new(None), clangwrap?)
     }
 
-    fn create(clangwrap: clangwrap::ClangWrap) -> Result<Self> {
+    fn create(log: Rc<Option<log::Logger>>, clangwrap: clangwrap::ClangWrap) -> Result<Self> {
         let methods_to_mock = MethodsToMockStrategy::AllVirtual;
         let mocksmith = Self {
+            log,
             clangwrap,
             generator: generate::Generator::new(methods_to_mock),
             include_paths: Vec::new(),

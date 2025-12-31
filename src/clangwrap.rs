@@ -3,6 +3,7 @@ use crate::{log, verbose};
 use capitalize::Capitalize;
 use std::{
     path::{Path, PathBuf},
+    rc::Rc,
     sync::{Mutex, MutexGuard, TryLockError},
 };
 
@@ -16,7 +17,7 @@ static DUMMY_FILE: &str = "mocksmith_dummy_input_file.h";
 // Struct to wrap the Clang library and a mutex guard to ensure only one thread can use it
 // at a time, at least via this library.
 pub(crate) struct ClangWrap {
-    log: Option<log::Logger>,
+    log: Rc<Option<log::Logger>>,
     clang: clang::Clang,
     // After clang::Clang to ensure releasing lock after Clang is dropped
     _clang_lock: MutexGuard<'static, ()>,
@@ -31,7 +32,7 @@ impl ClangWrap {
         CLANG_MUTEX.clear_poison();
     }
 
-    pub(crate) fn new(log: Option<log::Logger>) -> crate::Result<Self> {
+    pub(crate) fn new(log: Rc<Option<log::Logger>>) -> crate::Result<Self> {
         let clang_lock = CLANG_MUTEX.try_lock().map_err(|error| match error {
             TryLockError::WouldBlock => crate::MocksmithError::Busy,
             TryLockError::Poisoned(_) => MocksmithError::Poisoned,
@@ -41,12 +42,12 @@ impl ClangWrap {
 
     pub(crate) fn blocking_new() -> crate::Result<Self> {
         let clang_lock = CLANG_MUTEX.lock().map_err(|_| MocksmithError::Poisoned)?;
-        Self::create(clang_lock, None)
+        Self::create(clang_lock, Rc::new(None))
     }
 
     fn create(
         clang_lock: MutexGuard<'static, ()>,
-        log: Option<log::Logger>,
+        log: Rc<Option<log::Logger>>,
     ) -> crate::Result<Self> {
         let clang = clang::Clang::new().map_err(MocksmithError::ClangError)?;
         // Create clang object before getting version to ensure libclang is loaded
@@ -133,11 +134,11 @@ impl ClangWrap {
                 .filter(|diagnostic| {
                     diagnostic.get_severity() >= clang::diagnostic::Severity::Error
                 })
-                .for_each(|diagnostic| log!(&self.log, "{}", diagnostic));
+                .for_each(|diagnostic| log!(self.log, "{}", diagnostic));
         } else {
             diagnostics
                 .iter()
-                .for_each(|diagnostic| verbose!(&self.log, "{}", diagnostic));
+                .for_each(|diagnostic| verbose!(self.log, "{}", diagnostic));
         }
 
         if !self.ignore_errors {
