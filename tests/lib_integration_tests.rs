@@ -66,8 +66,6 @@ fn various_return_types_and_argument_types_can_be_mocked() {
 fn noexcept_and_const_qualifiers_are_added_when_needed() {
     let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
-          #include <string>
-          #include <cstdint>
           class Foo {
           public:
             virtual ~Foo() = default;
@@ -93,7 +91,6 @@ fn noexcept_and_const_qualifiers_are_added_when_needed() {
 fn ref_qualifiers_are_added_when_needed() {
     let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
-          #include <string>
           class Foo {
           public:
             virtual ~Foo() = default;
@@ -141,7 +138,6 @@ fn types_with_commas_are_wrapped_with_parenthesis() {
 fn protected_and_private_methods_are_mocked_as_public() {
     let mocksmith = Mocksmith::new_when_available().unwrap();
     let cpp_class = "
-          #include <map>
           class Foo {
           public:
             virtual ~Foo() = default;
