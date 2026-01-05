@@ -22,7 +22,7 @@ pub(crate) struct MethodToMock {
 }
 
 // Represents a method argument
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(crate) struct Argument {
     pub(crate) type_name: String,
     pub(crate) name: Option<String>,
@@ -227,5 +227,132 @@ impl crate::MethodsToMockStrategy {
             crate::MethodsToMockStrategy::AllVirtual => method.is_virtual_method(),
             crate::MethodsToMockStrategy::OnlyPureVirtual => method.is_pure_virtual_method(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::clangwrap::ClangWrap;
+
+    #[test]
+    fn class_with_methods_with_recognized_types() {
+        let code = r#"
+        class MyClass {
+        public:
+            virtual void foo() const noexcept;
+            int bar(int x);
+            virtual int baz() = 0;
+            static void staticMethod();
+        };
+        "#;
+
+        let clang = ClangWrap::blocking_new().unwrap();
+        let _ = clang.with_tu_from_string(&[], code, |tu| {
+            let classes =
+                classes_in_translation_unit(Rc::new(None), &tu, crate::MethodsToMockStrategy::All);
+
+            assert_eq!(classes.len(), 1);
+            let class = &classes[0];
+            assert_eq!(class.name, "MyClass");
+            // staticMethod should be excluded
+            assert_eq!(class.methods.len(), 3);
+
+            assert!(matches!(
+                &class.methods[0],
+                &MethodToMock {
+                    name: ref n,
+                    result_type: ref rt,
+                    arguments: ref args,
+                    is_const: true,
+                    is_virtual: true,
+                    is_noexcept: true,
+                    ref_qualifier: None,
+                }
+                if n == "foo" && rt == "void" && args.is_empty()
+            ));
+
+            assert!(matches!(
+                &class.methods[1],
+                &MethodToMock {
+                    name: ref n,
+                    result_type: ref rt,
+                    arguments: ref args,
+                    is_const: false,
+                    is_virtual: false,
+                    is_noexcept: false,
+                    ref_qualifier: None,
+                } if n == "bar"
+                     && rt == "int"
+                     && args == &vec![Argument{ type_name: "int".to_string(), name: Some("x".to_string()) }]
+            ));
+
+            assert!(matches!(
+                &class.methods[2],
+                &MethodToMock {
+                    name: ref n,
+                    result_type: ref rt,
+                    arguments: ref args,
+                    is_const: false,
+                    is_virtual: true,
+                    is_noexcept: false,
+                ref_qualifier: None,
+                } if n == "baz" && rt == "int" && args.is_empty()
+            ));
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn unknown_arguments_types_can_be_handled() {
+        let code = r#"
+        class MyClass {
+        public:
+            virtual void foo(Unknown x) const noexcept;
+            void bar(Unknown);
+            static void staticMethods(Unknown);
+        };
+        "#;
+
+        let clang = ClangWrap::blocking_new().unwrap();
+        let _ = clang.with_tu_from_string(&[], code, |tu| {
+            let classes =
+                classes_in_translation_unit(Rc::new(None), &tu, crate::MethodsToMockStrategy::All);
+
+            assert_eq!(classes.len(), 1);
+            let class = &classes[0];
+            assert_eq!(class.name, "MyClass");
+             // staticMethod should be excluded
+            assert_eq!(class.methods.len(), 2);
+
+            assert!(matches!(
+                &class.methods[0],
+                &MethodToMock {
+                    name: ref n,
+                    arguments: ref args,
+                    is_const: true,
+                    is_virtual: true,
+                    is_noexcept: true,
+                    ..
+                }
+                if n == "foo" && args == &vec![Argument { type_name: "Unknown".to_string(), name: Some("x".to_string()) }]
+            ));
+
+            assert!(matches!(
+                &class.methods[1],
+                &MethodToMock {
+                    name: ref n,
+                    arguments: ref args,
+                    is_const: false,
+                    is_virtual: false,
+                    is_noexcept: false,
+                    ..
+                }
+                if n == "bar" && args == &vec![Argument { type_name: "Unknown".to_string(), name: None }]
+            ));
+
+            Ok(())
+        });
     }
 }

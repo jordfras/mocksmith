@@ -305,7 +305,8 @@ mod tests {
 
     #[test]
     fn test_new_with_threads() {
-        let mocksmith = Mocksmith::new(None, false).unwrap();
+        // new_when_available to wait for other tests using ClangWrap
+        let mocksmith = Mocksmith::new_when_available().unwrap();
 
         let handle = std::thread::spawn(|| {
             assert!(matches!(
