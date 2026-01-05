@@ -243,6 +243,7 @@ mod tests {
             virtual void foo() const noexcept;
             int bar(int x);
             virtual int baz() = 0;
+            virtual auto bizz() const noexcept -> int = 0;
             static void staticMethod();
         };
         "#;
@@ -256,7 +257,7 @@ mod tests {
             let class = &classes[0];
             assert_eq!(class.name, "MyClass");
             // staticMethod should be excluded
-            assert_eq!(class.methods.len(), 3);
+            assert_eq!(class.methods.len(), 4);
 
             assert!(matches!(
                 &class.methods[0],
@@ -298,6 +299,19 @@ mod tests {
                     is_noexcept: false,
                 ref_qualifier: None,
                 } if n == "baz" && rt == "int" && args.is_empty()
+            ));
+
+            assert!(matches!(
+                &class.methods[3],
+                &MethodToMock {
+                    name: ref n,
+                    result_type: ref rt,
+                    arguments: ref args,
+                    is_const: true,
+                    is_virtual: true,
+                    is_noexcept: true,
+                    ref_qualifier: None,
+                } if n == "bizz" && rt == "int" && args.is_empty()
             ));
 
             Ok(())
