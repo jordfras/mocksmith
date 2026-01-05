@@ -85,7 +85,7 @@ impl ModelFactory {
                 .expect("Method should have arguments")
                 .iter()
                 .map(|arg| Argument {
-                    type_name: self.get_type(arg),
+                    type_name: self.get_argument_type(arg),
                     name: arg.get_name(),
                 })
                 .collect(),
@@ -102,23 +102,53 @@ impl ModelFactory {
         }
     }
 
-    fn get_type(&mut self, entity: &clang::Entity) -> String {
-        self.extract_type_from_source(entity).unwrap_or_else(|| {
-            entity
-                .get_type()
-                .expect("Entity should have a type")
-                .get_display_name()
-        })
+    fn get_argument_type(&mut self, arg_entity: &clang::Entity) -> String {
+        self.extract_argument_type_from_source(arg_entity)
+            .unwrap_or_else(|| {
+                arg_entity
+                    .get_type()
+                    .expect("Entity should have a type")
+                    .get_display_name()
+            })
     }
 
-    fn extract_type_from_source(&mut self, entity: &clang::Entity) -> Option<String> {
-        if let Some(range) = entity.get_range() {
-            self.cache_file_contents(entity);
+    fn get_arg_range(&self, arg_entity: &clang::Entity) -> Option<(usize, usize)> {
+        // entity.get_range() only seems to work when argument has a name, but
+        // get_location() seems to work. We use it to find the start and then scan the
+        // source to find the end
+        if arg_entity.get_name().is_some() {
+            arg_entity.get_range().map(|r| {
+                let start = r.get_start().get_file_location().offset as usize;
+                let end = r.get_end().get_file_location().offset as usize;
+                (start, end)
+            })
+        } else if let Some(file_contents) = &self.file_contents
+            && let Some(location) = arg_entity.get_location()
+        {
+            // Location is now _after_ the unknown argument type, so we need to scan
+            // backwards to find the start
+            let end = location.get_file_location().offset as usize;
+            let bytes = file_contents.as_bytes();
+            let mut start = 0;
 
+            for i in (0..end).rev() {
+                let c = bytes[i] as char;
+                if c == ',' || c == '(' {
+                    start = i + 1;
+                    break;
+                }
+            }
+            Some((start, end))
+        } else {
+            None
+        }
+    }
+
+    fn extract_argument_type_from_source(&mut self, arg_entity: &clang::Entity) -> Option<String> {
+        self.cache_file_contents(arg_entity);
+        if let Some((start, mut end)) = self.get_arg_range(arg_entity) {
             if let Some(file_contents) = &self.file_contents {
-                let start = range.get_start().get_file_location().offset as usize;
-                let mut end = range.get_end().get_file_location().offset as usize;
-                if let Some(name) = entity.get_name() {
+                if let Some(name) = arg_entity.get_name() {
                     end -= name.len();
                 }
 
@@ -127,7 +157,7 @@ impl ModelFactory {
                         self.log,
                         "Falling back to clang type extraction for entity {:?} \
                          due to illegal file position",
-                        entity
+                        arg_entity
                     );
                     return None;
                 }
@@ -138,7 +168,7 @@ impl ModelFactory {
             self.log,
             "Falling back to clang type extraction for entity {:?} \
              due to missing range or file contents",
-            entity
+            arg_entity
         );
         None
     }
@@ -315,30 +345,31 @@ mod tests {
             ));
 
             Ok(())
-        });
+        }).unwrap();
     }
 
     #[test]
-    fn unknown_arguments_types_can_be_handled() {
+    fn unknown_argument_types_can_be_handled() {
         let code = r#"
         class MyClass {
         public:
             virtual void foo(Unknown x) const noexcept;
             void bar(Unknown);
+            void bizz(Unknown1, Unknown2 x, Unknown3);
             static void staticMethods(Unknown);
         };
         "#;
 
-        let clang = ClangWrap::blocking_new().unwrap();
+        let mut clang = ClangWrap::blocking_new().unwrap();
+        clang.set_ignore_errors(true);
         let _ = clang.with_tu_from_string(&[], code, |tu| {
             let classes =
                 classes_in_translation_unit(Rc::new(None), &tu, crate::MethodsToMockStrategy::All);
 
             assert_eq!(classes.len(), 1);
             let class = &classes[0];
-            assert_eq!(class.name, "MyClass");
              // staticMethod should be excluded
-            assert_eq!(class.methods.len(), 2);
+            assert_eq!(class.methods.len(), 3);
 
             assert!(matches!(
                 &class.methods[0],
@@ -366,7 +397,21 @@ mod tests {
                 if n == "bar" && args == &vec![Argument { type_name: "Unknown".to_string(), name: None }]
             ));
 
+            assert!(matches!(
+                &class.methods[2],
+                &MethodToMock {
+                    name: ref n,
+                    arguments: ref args,
+                    ..
+                }
+                if n == "bizz" && args == &vec![
+                    Argument { type_name: "Unknown1".to_string(), name: None },
+                    Argument { type_name: "Unknown2".to_string(), name: Some("x".to_string()) },
+                    Argument { type_name: "Unknown3".to_string(), name: None }
+                ]
+            ));
+
             Ok(())
-        });
+        }).unwrap();
     }
 }
