@@ -17,8 +17,10 @@ pub(crate) struct MethodToMock {
     pub(crate) name: String,
     pub(crate) result_type: String,
     pub(crate) arguments: Vec<Argument>,
+    is_static: bool,
     pub(crate) is_const: bool,
     pub(crate) is_virtual: bool,
+    is_pure_virtual: bool,
     pub(crate) is_noexcept: bool,
     pub(crate) ref_qualifier: Option<String>,
 }
@@ -107,11 +109,12 @@ impl<'a> AstTraverser<'a> {
 }
 
 impl crate::MethodsToMockStrategy {
-    fn should_mock(self, method: &clang::Entity) -> bool {
+    // TODO: Must look at MethodToMock rather than clang::Entity!
+    fn should_mock(self, method: &MethodToMock) -> bool {
         match self {
-            crate::MethodsToMockStrategy::All => !method.is_static_method(),
-            crate::MethodsToMockStrategy::AllVirtual => method.is_virtual_method(),
-            crate::MethodsToMockStrategy::OnlyPureVirtual => method.is_pure_virtual_method(),
+            crate::MethodsToMockStrategy::All => !method.is_static,
+            crate::MethodsToMockStrategy::AllVirtual => method.is_virtual,
+            crate::MethodsToMockStrategy::OnlyPureVirtual => method.is_pure_virtual,
         }
     }
 }
