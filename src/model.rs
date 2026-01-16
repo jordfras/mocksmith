@@ -146,23 +146,23 @@ impl ModelFactory {
 
     fn extract_argument_type_from_source(&mut self, arg_entity: &clang::Entity) -> Option<String> {
         self.cache_file_contents(arg_entity);
-        if let Some((start, mut end)) = self.get_arg_range(arg_entity) {
-            if let Some(file_contents) = &self.file_contents {
-                if let Some(name) = arg_entity.get_name() {
-                    end -= name.len();
-                }
-
-                if start >= end || end > file_contents.len() {
-                    log!(
-                        self.log,
-                        "Falling back to clang type extraction for entity {:?} \
-                         due to illegal file position",
-                        arg_entity
-                    );
-                    return None;
-                }
-                return Some(file_contents[start..end].trim().to_string());
+        if let Some((start, mut end)) = self.get_arg_range(arg_entity)
+            && let Some(file_contents) = &self.file_contents
+        {
+            if let Some(name) = arg_entity.get_name() {
+                end -= name.len();
             }
+
+            if start >= end || end > file_contents.len() {
+                log!(
+                    self.log,
+                    "Falling back to clang type extraction for entity {:?} \
+                         due to illegal file position",
+                    arg_entity
+                );
+                return None;
+            }
+            return Some(file_contents[start..end].trim().to_string());
         }
         log!(
             self.log,
