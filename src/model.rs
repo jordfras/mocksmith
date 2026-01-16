@@ -57,6 +57,7 @@ impl ModelFactory {
         namespaces: &Vec<clang::Entity>,
         methods_to_mock: crate::MethodsToMockStrategy,
     ) -> ClassToMock {
+        self.cache_file_contents(class);
         ClassToMock {
             name: class.get_name().expect("Class should have a name"),
             namespaces: namespaces
@@ -145,7 +146,6 @@ impl ModelFactory {
     }
 
     fn extract_argument_type_from_source(&mut self, arg_entity: &clang::Entity) -> Option<String> {
-        self.cache_file_contents(arg_entity);
         if let Some((start, mut end)) = self.get_arg_range(arg_entity)
             && let Some(file_contents) = &self.file_contents
         {
