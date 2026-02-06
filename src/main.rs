@@ -112,7 +112,7 @@ fn main() -> anyhow::Result<()> {
             &header.code,
             arguments.always_write,
         )?;
-    } else if arguments.output_dir.is_some() {
+    } else if let Some(output_dir) = arguments.output_dir {
         let headers = arguments
             .source_files
             .iter()
@@ -127,7 +127,6 @@ fn main() -> anyhow::Result<()> {
                     })
             })
             .collect::<anyhow::Result<Vec<MockHeader>>>()?;
-        let output_dir = arguments.output_dir.unwrap();
         if !arguments.no_create_output_dir {
             maybe_create_dir(output_dir.as_path())?;
         }
