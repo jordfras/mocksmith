@@ -45,6 +45,14 @@ macro_rules! assert_mocks {
                 err
             )
         });
+
+        assert_eq!(actual_mocks.len(),
+            expected_mocks.len(),
+            "Number of generated mocks ({}) does not match expected ({})",
+            actual_mocks.len(),
+            expected_mocks.len()
+        );
+
         actual_mocks.iter()
             .zip(expected_mocks.iter())
             .for_each(|(actual, expected)| {

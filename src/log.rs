@@ -3,7 +3,7 @@ use std::{cell::RefCell, io::Write};
 #[macro_export]
 macro_rules! log {
     ($logger:expr, $($arg:tt)*) => {
-        if let Some(logger) = &$logger {
+        if let Some(logger) = &*$logger {
                 logger.log(&format!($($arg)*));
         }
     };
@@ -12,7 +12,7 @@ macro_rules! log {
 #[macro_export]
 macro_rules! verbose {
     ($logger:expr, $($arg:tt)*) => {
-        if let Some(logger) = &$logger {
+        if let Some(logger) = &*$logger {
         if logger.verbose {
                 logger.log(&format!($($arg)*));
             }
@@ -42,6 +42,7 @@ impl Logger {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::rc::Rc;
 
     #[test]
     fn macro_doesnt_evaluate_args_if_verbose_disabled() {
@@ -52,7 +53,7 @@ mod tests {
         };
 
         let write = Box::new(Vec::<u8>::new());
-        let log = Some(Logger::new(write, false));
+        let log = Rc::new(Some(Logger::new(write, false)));
         verbose!(log, "{}", fun());
         assert_eq!(calls, 0);
     }
@@ -66,7 +67,7 @@ mod tests {
         };
 
         let write = Box::new(Vec::<u8>::new());
-        let log = Some(Logger::new(write, true));
+        let log = Rc::new(Some(Logger::new(write, true)));
         verbose!(log, "{}", fun());
         assert_eq!(calls, 1);
     }
